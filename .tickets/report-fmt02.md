@@ -43,6 +43,8 @@ Plain text output designed to be copied and pasted into a WYSIWYG forum editor a
 
 **Format:** Plain text columns using spaces for alignment, same structure as the current code block output but without the code block wrapper. Dashes for section separators.
 
+**Note:** Desktop only. Mobile forum strips newlines from pasted plain text. A separate HTML format for mobile is tracked in report-fmt03.
+
 To document:
 - [ ] Confirm plain text with space-aligned columns is acceptable, or if any other formatting is preferred
 
