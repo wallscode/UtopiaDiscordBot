@@ -34,11 +34,17 @@ To document:
 
 Plain text output designed to be copied and pasted into a WYSIWYG forum editor and render correctly. Options depend on the target forum software.
 
+**Forum:** Utopia Game (utopia-game.com) kingdom forum, using `jquery.wysiwyg`.
+
+**Constraints identified from page source:**
+- `insertTable` is disabled — no table support
+- Bold, italic, underline, and h1 are available but content will be pasted as plain text
+- Output should be plain text with consistent spacing/alignment that reads cleanly when pasted
+
+**Format:** Plain text columns using spaces for alignment, same structure as the current code block output but without the code block wrapper. Dashes for section separators.
+
 To document:
-- [ ] What forum software is the target? (e.g., phpBB, vBulletin, XenForo, Discourse, custom)
-- [ ] Does the forum use BBCode, Markdown, HTML, or its own formatting?
-- [ ] Desired visual structure in the forum post (table, bullet list, plain text columns?)
-- [ ] Example of what the pasted result should look like in the forum
+- [ ] Confirm plain text with space-aligned columns is acceptable, or if any other formatting is preferred
 
 ## Implementation Notes
 
