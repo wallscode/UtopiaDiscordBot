@@ -1,6 +1,6 @@
 ---
 id: setup-env01
-status: open
+status: closed
 type: task
 priority: 1
 created: 2026-03-12T00:00:00Z
@@ -38,6 +38,6 @@ Set up the local Node.js project with discord.js and project structure.
 
 ## Acceptance Criteria
 
-- [ ] `npm start` (or `node src/index.js`) starts the bot without errors
-- [ ] Bot appears online in Discord
-- [ ] `.env` is gitignored and not committed
+- [x] `npm start` (or `node src/index.js`) starts the bot without errors
+- [x] Bot appears online in Discord
+- [x] `.env` is gitignored and not committed
