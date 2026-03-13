@@ -32,7 +32,7 @@ client.on('messageCreate', (message) => {
 
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
-  if (interaction.commandName === 'dragon') {
+  if (interaction.commandName === 'dragon-stats') {
     await dragonCommand.execute(interaction);
   }
 });

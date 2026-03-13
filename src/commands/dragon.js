@@ -3,7 +3,7 @@ const { generateDragonReport } = require('../reports/dragonReport');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('dragon')
+    .setName('dragon-stats')
     .setDescription('Display the Dragon Summary report'),
 
   async execute(interaction) {
