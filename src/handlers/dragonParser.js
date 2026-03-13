@@ -1,7 +1,8 @@
 const DONATION_REGEX = /DRAGON (.+?) \[.+?\] donated ([\d,]+) (gold coins|bushels) to fund dragon!/;
 const ATTACK_REGEX = /DRAGON (.+?) \[.+?\] sent ([\d,]+) troops and weakened dragon by ([\d,]+) points!/;
 
-function parseMessage(content) {
+function parseMessage(rawContent) {
+  const content = rawContent.replace(/__/g, '');
   const donationMatch = content.match(DONATION_REGEX);
   if (donationMatch) {
     const [, province, amount, resource] = donationMatch;

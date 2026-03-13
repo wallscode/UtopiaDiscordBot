@@ -1,6 +1,6 @@
 ---
 id: report-cmd01
-status: open
+status: closed
 type: feature
 priority: 2
 created: 2026-03-12T00:00:00Z
