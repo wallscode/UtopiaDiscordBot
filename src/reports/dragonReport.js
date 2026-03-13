@@ -17,22 +17,14 @@ function buildDonationSection(provinces, nameWidth) {
 
   for (const p of sorted) {
     const name = p.province.padEnd(nameWidth);
-    let value;
-    if (p.bushelsDonated > 0) {
-      value = `${formatNum(p.goldDonated)} gc & ${formatNum(p.bushelsDonated)} bushels`;
-    } else {
-      value = p.goldDonated > 0 ? formatNum(p.goldDonated) : '0';
-    }
+    const value = `GC: ${formatNum(p.goldDonated)}   Bushels: ${formatNum(p.bushelsDonated)}`;
     lines.push(`${name} ${value}`);
     totalGold += p.goldDonated;
     totalBushels += p.bushelsDonated;
   }
 
   lines.push('');
-  const totalValue = totalBushels > 0
-    ? `${formatNum(totalGold)} gc & ${formatNum(totalBushels)} bushels`
-    : formatNum(totalGold);
-  lines.push(`${'Total'.padEnd(nameWidth)} ${totalValue}`);
+  lines.push(`${'Total'.padEnd(nameWidth)} GC: ${formatNum(totalGold)}   Bushels: ${formatNum(totalBushels)}`);
   return lines.join('\n');
 }
 
@@ -80,4 +72,26 @@ function generateForumReport() {
   ];
 }
 
-module.exports = { generateDragonReport, generateForumReport };
+function generateMobileForumReport() {
+  const provinces = getAll();
+  if (provinces.length === 0) {
+    return ['No data recorded yet.'];
+  }
+
+  const nameWidth = Math.max(...provinces.map((p) => p.province.length)) + 2;
+
+  const donationLines = buildDonationSection(provinces, nameWidth)
+    .replace('Gold Coins & Food Donated:', '<b>Gold Coins & Food Donated:</b>')
+    .split('\n').join('<br>');
+
+  const attackLines = buildAttackSection(provinces, nameWidth)
+    .replace('Troops Sent and Points Weakened:', '<b>Troops Sent and Points Weakened:</b>')
+    .split('\n').join('<br>');
+
+  return [
+    `\`\`\`\n<pre><b>Dragon Summary</b><br><br>${donationLines}</pre>\n\`\`\``,
+    `\`\`\`\n<pre>${attackLines}</pre>\n\`\`\``,
+  ];
+}
+
+module.exports = { generateDragonReport, generateForumReport, generateMobileForumReport };

@@ -1,6 +1,6 @@
 ---
 id: report-fmt03
-status: open
+status: closed
 type: feature
 priority: 3
 created: 2026-03-13T00:00:00Z

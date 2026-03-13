@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { generateDragonReport, generateForumReport } = require('../reports/dragonReport');
+const { generateDragonReport, generateForumReport, generateMobileForumReport } = require('../reports/dragonReport');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -11,13 +11,17 @@ module.exports = {
         .setDescription('Output format')
         .addChoices(
           { name: 'discord', value: 'discord' },
-          { name: 'forum', value: 'forum' }
+          { name: 'forum', value: 'forum' },
+          { name: 'mobile-forum', value: 'mobile-forum' }
         )
     ),
 
   async execute(interaction) {
     const format = interaction.options.getString('format') ?? 'discord';
-    const messages = format === 'forum' ? generateForumReport() : generateDragonReport();
+    const messages =
+      format === 'forum' ? generateForumReport() :
+      format === 'mobile-forum' ? generateMobileForumReport() :
+      generateDragonReport();
 
     await interaction.reply({ content: messages[0] });
     for (let i = 1; i < messages.length; i++) {
