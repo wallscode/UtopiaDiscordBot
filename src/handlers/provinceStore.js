@@ -37,4 +37,23 @@ function getUpdatedAt() {
   return updatedAt;
 }
 
-module.exports = { load, rebuild, getAll, getUpdatedAt };
+function addProvince(name) {
+  const trimmed = name.trim();
+  if (provinces.includes(trimmed)) return false;
+  provinces = [...provinces, trimmed].sort((a, b) => a.localeCompare(b));
+  updatedAt = new Date().toISOString();
+  save();
+  return true;
+}
+
+function removeProvince(name) {
+  const trimmed = name.trim();
+  const index = provinces.findIndex((p) => p.toLowerCase() === trimmed.toLowerCase());
+  if (index === -1) return false;
+  provinces = provinces.filter((_, i) => i !== index);
+  updatedAt = new Date().toISOString();
+  save();
+  return true;
+}
+
+module.exports = { load, rebuild, getAll, getUpdatedAt, addProvince, removeProvince };

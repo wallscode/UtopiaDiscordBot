@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { getAll, getUpdatedAt } = require('../handlers/provinceStore');
+const { getAll, getUpdatedAt, addProvince, removeProvince } = require('../handlers/provinceStore');
 const { scanProvinces } = require('../handlers/provinceScanner');
 
 const ADMIN_ROLE_NAME = process.env.ADMIN_ROLE_NAME || 'Admin';
@@ -13,51 +13,79 @@ function isAdmin(member) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('provinces')
-    .setDescription('Display the province inventory')
+    .setDescription('Display and manage the province inventory')
     .addStringOption((option) =>
       option
         .setName('action')
-        .setDescription('Use "refresh" to rebuild the province list (admin only)')
-        .addChoices({ name: 'refresh', value: 'refresh' })
+        .setDescription('Action to perform')
+        .addChoices(
+          { name: 'refresh', value: 'refresh' },
+          { name: 'add', value: 'add' },
+          { name: 'remove', value: 'remove' }
+        )
+    )
+    .addStringOption((option) =>
+      option
+        .setName('name')
+        .setDescription('Province name (required for add/remove)')
     ),
 
   async execute(interaction) {
     const action = interaction.options.getString('action');
+    const name = interaction.options.getString('name');
 
+    // --- ADD ---
+    if (action === 'add') {
+      if (!isAdmin(interaction.member)) {
+        return interaction.reply({ content: 'You do not have permission to add provinces.', ephemeral: true });
+      }
+      if (!name) {
+        return interaction.reply({ content: 'Please provide a province name: `/provinces action:add name:Province Name`', ephemeral: true });
+      }
+      const added = addProvince(name);
+      return interaction.reply(
+        added ? `Added province: **${name}**` : `**${name}** is already in the inventory.`
+      );
+    }
+
+    // --- REMOVE ---
+    if (action === 'remove') {
+      if (!isAdmin(interaction.member)) {
+        return interaction.reply({ content: 'You do not have permission to remove provinces.', ephemeral: true });
+      }
+      if (!name) {
+        return interaction.reply({ content: 'Please provide a province name: `/provinces action:remove name:Province Name`', ephemeral: true });
+      }
+      const removed = removeProvince(name);
+      return interaction.reply(
+        removed ? `Removed province: **${name}**` : `**${name}** was not found in the inventory.`
+      );
+    }
+
+    // --- REFRESH ---
     if (action === 'refresh') {
       if (!isAdmin(interaction.member)) {
-        return interaction.reply({
-          content: 'You do not have permission to refresh the province list.',
-          ephemeral: true,
-        });
+        return interaction.reply({ content: 'You do not have permission to refresh the province list.', ephemeral: true });
       }
-
       await interaction.deferReply();
-      const guild = interaction.guild;
-      const count = await scanProvinces(guild);
+      const count = await scanProvinces(interaction.guild);
       return interaction.editReply(`Province list rebuilt. ${count} provinces found.`);
     }
 
-    // Default: display inventory
+    // --- DEFAULT: list ---
     const provinces = getAll();
     const updatedAt = getUpdatedAt();
 
     if (provinces.length === 0) {
-      return interaction.reply(
-        'No province inventory yet. Run `/provinces action:refresh` to build it.'
-      );
+      return interaction.reply('No province inventory yet. Run `/provinces action:refresh` to build it.');
     }
 
-    const timestamp = updatedAt
-      ? new Date(updatedAt).toUTCString()
-      : 'unknown';
-
-    const list = provinces.join('\n');
+    const timestamp = updatedAt ? new Date(updatedAt).toUTCString() : 'unknown';
     const header = `Province Inventory — ${provinces.length} provinces (last updated: ${timestamp})\n\n`;
+    const list = provinces.join('\n');
     const output = header + list;
 
-    // Split if over 2000 chars
-    if (output.length <= 2000) {
+    if (output.length <= 1900) {
       return interaction.reply({ content: `\`\`\`\n${output}\n\`\`\`` });
     }
 
