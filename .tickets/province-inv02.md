@@ -1,6 +1,6 @@
 ---
 id: province-inv02
-status: open
+status: closed
 type: task
 priority: 1
 created: 2026-03-13T00:00:00Z

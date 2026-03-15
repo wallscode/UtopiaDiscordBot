@@ -35,20 +35,22 @@ Based on analysis of all channel data (aid, attackers, ritual, dragons, tms), th
 **Options:**
 - `/activity` — list all provinces sorted by most recently active (newest first)
 - `/activity province:<name>` — show only one province and their last action
-- `/activity days:<n>` — only show provinces with no activity in the last N days (inactive filter)
+- `/activity hours:<n>` — only show provinces with no activity in the last N hours (inactive filter)
 
 **Output example:**
 ```
 Province Activity (last seen)
 ----------------------------------------
-Fun times          2026-03-13 14:22 UTC  [attack]
-Ill be there...    2026-03-13 12:10 UTC  [aid sent]
-Age of time        2026-03-01 08:44 UTC  [ritual]  ⚠ 13 days ago
+Fun times          2026-03-13 14:22 UTC  [attack] 1 hour ago
+Ill be there...    2026-03-13 12:10 UTC  [aid sent] 3 hours ago
+Age of time        2026-03-01 08:44 UTC  [ritual]  240 hours ago
 ```
 
 **Notes:**
-- Only counts actions the province *initiated* (not receiving aid, not being attacked)
-- Channels counted: dragons, aid (sender only), attackers, ritual, tms (sender only)
+- Only counts actions the province *initiated* (not receiving aid, not being attacked, not spells expiring)
+- Channels counted: dragons, aid (sender only), attackers, ritual, tms, and general
+- In the general channel only count lines that contain :star2: with either :green_heart: (indicating the successful cast of a self-spell) or :broken_heart: (indicating the failed cast of a self-spell)
+- Only count actions posted by Utopiabot
 
 ---
 
@@ -57,7 +59,7 @@ Age of time        2026-03-01 08:44 UTC  [ritual]  ⚠ 13 days ago
 
 **Options:**
 - `/province-report province:<name>` — all activity, all time
-- `/province-report province:<name> period:<24h|7d|30d|all>` — filter by time window
+- `/province-report province:<name> period:<hours>` — filter by time window
 - `/province-report province:<name> type:<attacks|aid|rituals|espionage|dragon|all>` — filter by action type
 
 **Output example:**
@@ -83,8 +85,8 @@ Shows combat statistics across the kingdom, ranked by activity.
 
 **Options:**
 - `/attack-stats` — kingdom-wide summary, all time
-- `/attack-stats province:<name>` — stats for one province
-- `/attack-stats period:<7d|30d|all>` — filter by time window
+- `/attack-stats province:<name> period:<hours>` — stats for one province for the last X hours
+- `/attack-stats period:<hours>` — all provinces filtered by time window
 
 **Data shown per province:**
 - Total attacks made
@@ -109,8 +111,8 @@ Shows who sent and received aid across the kingdom.
 
 **Options:**
 - `/aid-summary` — all aid sent/received, all provinces, all time
-- `/aid-summary province:<name>` — aid sent and received by one province
-- `/aid-summary period:<7d|30d|all>` — filter by time window
+- `/aid-summary province:<name> period:<hours>` — aid sent and received by one province for the last X hours
+- `/aid-summary period:<hours>` — all provinces filtered by time window
 - `/aid-summary type:<gold|bushels|soldiers|runes>` — filter by resource type
 
 **Data shown:**
@@ -138,8 +140,8 @@ Shows spy/thievery operation stats across the kingdom. The `tms` channel is the 
 
 **Options:**
 - `/espionage-stats` — kingdom-wide summary
-- `/espionage-stats province:<name>` — one province's espionage record
-- `/espionage-stats period:<7d|30d|all>` — filter by time window
+- `/espionage-stats province:<name> period:<hours>` — one province's espionage record
+- `/espionage-stats period:<hours>` — filter by time window
 - `/espionage-stats type:<spy|rob|survey|arson|all>` — filter by operation type
 
 **Data shown per province:**
@@ -165,7 +167,8 @@ Shows ritual cast counts per province, ranked by activity.
 
 **Options:**
 - `/ritual-stats` — all provinces, total casts, sorted by count
-- `/ritual-stats province:<name>` — one province's cast history
+- `/ritual-stats province:<name> period:<hours>` — one province's cast history for the last X hours
+- `/ritual-stats period:<hours>` — all provinces filtered by time window
 
 **Data shown:**
 - Total rituals cast per province
@@ -175,29 +178,10 @@ Shows ritual cast counts per province, ranked by activity.
 ```
 Ritual Summary
 ----------------------------------------
-Fun times              16 casts   (last: 2026-03-07)
-RazorclawTime          14 casts   (last: 2026-03-07)
-About time dude        12 casts   (last: 2026-03-09)
-Misstress Of Time       1 cast    (last: 2026-03-09)
-```
-
----
-
-### `/leaderboard` — Kingdom Rankings
-Shows a ranked leaderboard across any single metric. Quick way to see who's contributing most in a specific area.
-
-**Options:**
-- `/leaderboard metric:<attacks|kills|aid-sent|gold-donated|bushels-donated|rituals|espionage-ops|gold-stolen|dragon-points>` — required, choose metric
-- `/leaderboard metric:<x> period:<7d|30d|all>` — filter by time window
-
-**Output example (`metric:kills`):**
-```
-Leaderboard — Total Kills
-----------------------------------------
-1.  Fun times              3,241 kills
-2.  Pee Time               2,180 kills
-3.  ticking time           2,100 kills
-...
+Fun times              16 casts
+RazorclawTime          14 casts
+About time dude        12 casts
+Misstress Of Time       1 cast
 ```
 
 ---
@@ -207,7 +191,7 @@ A comprehensive single report for one province combining all data sources. The m
 
 **Options:**
 - `/kingdom-report province:<name>` — full report, all time
-- `/kingdom-report province:<name> period:<7d|30d|all>` — filter by time
+- `/kingdom-report province:<name> period:<hours>` — filter by time
 
 **Sections included:**
 - Last seen timestamp
@@ -228,18 +212,17 @@ A comprehensive single report for one province combining all data sources. The m
 - All commands that scan historical data should read from channel data stored in memory or local JSON (not re-fetch from Discord each time)
 - This implies a new startup backfill that loads and parses all channels (aid, attackers, ritual, tms) similar to how dragons are handled today
 - Each channel needs its own parser module and in-memory store
-- The `period` option across all commands should accept: `24h`, `7d`, `30d`, `all`
+- The `period` option across all commands should accept a number of hours (e.g., 24, 48, 72)
 - Province name matching should be case-insensitive
 
 ## Review Checklist
 
 Mark each command with your decision:
 
-- [ ] `/activity` — last seen tracker
-- [ ] `/province-report` — per-province activity summary
-- [ ] `/attack-stats` — military attack summary
-- [ ] `/aid-summary` — resource aid summary
-- [ ] `/espionage-stats` — thievery/espionage summary
-- [ ] `/ritual-stats` — ritual casting summary
-- [ ] `/leaderboard` — rankings by metric
-- [ ] `/kingdom-report` — full cross-channel province report
+- [x] `/activity` — last seen tracker
+- [x] `/province-report` — per-province activity summary
+- [x] `/attack-stats` — military attack summary
+- [x] `/aid-summary` — resource aid summary
+- [x] `/espionage-stats` — thievery/espionage summary
+- [x] `/ritual-stats` — ritual casting summary
+- [x] `/kingdom-report` — full cross-channel province report
