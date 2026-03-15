@@ -3,14 +3,19 @@ const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
 const { parseMessage } = require('./handlers/dragonParser');
 const { load: loadDragon, record } = require('./handlers/dragonStore');
 const { load: loadProvinces } = require('./handlers/provinceStore');
+const { load: loadActivity, update: updateActivity } = require('./handlers/activityStore');
 const { backfill } = require('./handlers/backfill');
+const { backfillActivity } = require('./handlers/activityBackfill');
+const { parseMessage: parseActivityMessage } = require('./handlers/activityParser');
 const dragonCommand = require('./commands/dragon');
 const provincesCommand = require('./commands/provinces');
+const activityCommand = require('./commands/activity');
 
 loadDragon();
 loadProvinces();
+loadActivity();
 
-const COMMANDS = [dragonCommand, provincesCommand];
+const COMMANDS = [dragonCommand, provincesCommand, activityCommand];
 
 async function registerCommands() {
   const rest = new REST().setToken(process.env.DISCORD_TOKEN);
@@ -21,7 +26,8 @@ async function registerCommands() {
   console.log('Slash commands registered.');
 }
 
-const WATCHED_CHANNELS = ['dragons'];
+const DRAGON_CHANNEL = 'dragons';
+const ACTIVITY_CHANNELS = ['dragons', 'aid', 'attackers', 'ritual', 'tms', 'general'];
 const SOURCE_BOT_USERNAME = 'utopiabot';
 
 const client = new Client({
@@ -37,17 +43,30 @@ client.once('clientReady', async () => {
   await registerCommands();
   const guild = client.guilds.cache.get(process.env.GUILD_ID);
   await backfill(guild, 'dragons');
+  await backfillActivity(guild);
 });
 
 client.on('messageCreate', (message) => {
   if (message.author.username !== SOURCE_BOT_USERNAME) return;
-  if (!WATCHED_CHANNELS.includes(message.channel.name)) return;
 
-  const parsed = parseMessage(message.content);
-  if (!parsed) return;
+  const channelName = message.channel.name;
 
-  record(parsed, message.id);
-  console.log(`Recorded [${parsed.type}] for province: ${parsed.province}`);
+  // Dragon parsing (donations + attacks)
+  if (channelName === DRAGON_CHANNEL) {
+    const parsed = parseMessage(message.content);
+    if (parsed) {
+      record(parsed, message.id);
+      console.log(`Recorded [${parsed.type}] for province: ${parsed.province}`);
+    }
+  }
+
+  // Activity tracking across all channels
+  if (ACTIVITY_CHANNELS.includes(channelName)) {
+    const events = parseActivityMessage(message.content, channelName);
+    for (const { province, action } of events) {
+      updateActivity(province, message.createdAt.toISOString(), action);
+    }
+  }
 });
 
 client.on('interactionCreate', async (interaction) => {
