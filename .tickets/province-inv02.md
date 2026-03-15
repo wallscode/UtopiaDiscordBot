@@ -25,13 +25,14 @@ Define which messages in the general channel contain province names and how to e
 ## Example Section (fill in)
 
 ```
-Channel: #general (confirm exact name)
+Channel: #general
 
 Example message 1:
-<paste raw message>
+:star2::green_heart: About time dude about time dud#  <<fertile lands>> 21 | 12.1% guilds (60% BE (m.7.3))
 
 Province name extracted:
--
+-About time dude
+Note that the province name is in the format <<province name>> and if it contains a repeat of the same text with the last character replaced with # then that indicates that the repeat text can be ignored.  So in the example above, "about time dude" is the province name.
 
 Example message 2:
 <paste raw message>
