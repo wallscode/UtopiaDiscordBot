@@ -1,17 +1,22 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
 const { parseMessage } = require('./handlers/dragonParser');
-const { load, record } = require('./handlers/dragonStore');
+const { load: loadDragon, record } = require('./handlers/dragonStore');
+const { load: loadProvinces } = require('./handlers/provinceStore');
 const { backfill } = require('./handlers/backfill');
 const dragonCommand = require('./commands/dragon');
+const provincesCommand = require('./commands/provinces');
 
-load();
+loadDragon();
+loadProvinces();
+
+const COMMANDS = [dragonCommand, provincesCommand];
 
 async function registerCommands() {
   const rest = new REST().setToken(process.env.DISCORD_TOKEN);
   await rest.put(
     Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
-    { body: [dragonCommand.data.toJSON()] }
+    { body: COMMANDS.map((c) => c.data.toJSON()) }
   );
   console.log('Slash commands registered.');
 }
@@ -47,10 +52,10 @@ client.on('messageCreate', (message) => {
 
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
+  const command = COMMANDS.find((c) => c.data.name === interaction.commandName);
+  if (!command) return;
   try {
-    if (interaction.commandName === 'dragon-stats') {
-      await dragonCommand.execute(interaction);
-    }
+    await command.execute(interaction);
   } catch (error) {
     console.error('Command error:', error);
     const msg = { content: 'An error occurred running that command.', ephemeral: true };
