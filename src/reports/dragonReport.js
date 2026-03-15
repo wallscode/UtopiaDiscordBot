@@ -1,4 +1,32 @@
-const { getAll } = require('../handlers/dragonStore');
+const { getAll: getDragonData } = require('../handlers/dragonStore');
+const { getAll: getProvinces } = require('../handlers/provinceStore');
+
+function getMergedProvinces() {
+  const dragonData = getDragonData();
+  const dragonMap = new Map(dragonData.map((p) => [p.province.toLowerCase(), p]));
+  const inventory = getProvinces();
+
+  // Start with all inventory provinces, filling in dragon data where available
+  const merged = new Map();
+  for (const name of inventory) {
+    merged.set(name.toLowerCase(), dragonMap.get(name.toLowerCase()) ?? {
+      province: name,
+      goldDonated: 0,
+      bushelsDonated: 0,
+      troopsSent: 0,
+      pointsWeakened: 0,
+    });
+  }
+
+  // Include any provinces from dragon data not in the inventory
+  for (const entry of dragonData) {
+    if (!merged.has(entry.province.toLowerCase())) {
+      merged.set(entry.province.toLowerCase(), entry);
+    }
+  }
+
+  return [...merged.values()];
+}
 
 function formatNum(n) {
   return n.toLocaleString('en-US');
@@ -45,7 +73,7 @@ function buildAttackSection(provinces, nameWidth) {
 }
 
 function generateDragonReport() {
-  const provinces = getAll();
+  const provinces = getMergedProvinces();
   if (provinces.length === 0) {
     return ['No data recorded yet.'];
   }
@@ -59,7 +87,7 @@ function generateDragonReport() {
 }
 
 function generateForumReport() {
-  const provinces = getAll();
+  const provinces = getMergedProvinces();
   if (provinces.length === 0) {
     return ['No data recorded yet.'];
   }
@@ -73,7 +101,7 @@ function generateForumReport() {
 }
 
 function generateMobileForumReport() {
-  const provinces = getAll();
+  const provinces = getMergedProvinces();
   if (provinces.length === 0) {
     return ['No data recorded yet.'];
   }
