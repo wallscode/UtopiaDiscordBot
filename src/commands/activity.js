@@ -20,7 +20,7 @@ function buildReport(entries, nameWidth) {
     const hours = hoursAgo(timestamp);
     const name = province.padEnd(nameWidth);
     const ts = formatTimestamp(timestamp);
-    lines.push(`${name}  ${ts}  [${action}]  ${hours}h ago`);
+    lines.push(`${name}  ${hours}h ago  [${action}]  ${ts}`);
   }
 
   return lines.join('\n');
@@ -53,7 +53,7 @@ module.exports = {
       const hours = hoursAgo(entry.timestamp);
       const ts = formatTimestamp(entry.timestamp);
       return interaction.reply(
-        `\`\`\`\n${entry.province}\nLast seen: ${ts}  [${entry.action}]  ${hours}h ago\n\`\`\``
+        `\`\`\`\n${entry.province}\nLast seen: ${hours}h ago  [${entry.action}]  ${ts}\n\`\`\``
       );
     }
 
