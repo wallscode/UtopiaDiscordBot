@@ -6,16 +6,40 @@ const { load: loadProvinces } = require('./handlers/provinceStore');
 const { load: loadActivity, update: updateActivity } = require('./handlers/activityStore');
 const { backfill } = require('./handlers/backfill');
 const { backfillActivity } = require('./handlers/activityBackfill');
+const { backfillEvents } = require('./handlers/eventBackfill');
 const { parseMessage: parseActivityMessage } = require('./handlers/activityParser');
+const { addAid, addAttack, addRitual, addEspionage } = require('./handlers/eventStore');
+const { parseAidMessage } = require('./parsers/aidParser');
+const { parseAttackMessage } = require('./parsers/attackParser');
+const { parseRitualMessage } = require('./parsers/ritualParser');
+const { parseEspionageMessage } = require('./parsers/espionageParser');
 const dragonCommand = require('./commands/dragon');
 const provincesCommand = require('./commands/provinces');
 const activityCommand = require('./commands/activity');
+const attackStatsCommand = require('./commands/attackStats');
+const aidSummaryCommand = require('./commands/aidSummary');
+const espionageStatsCommand = require('./commands/espionageStats');
+const ritualStatsCommand = require('./commands/ritualStats');
+const provinceReportCommand = require('./commands/provinceReport');
+const kingdomReportCommand = require('./commands/kingdomReport');
+const timeConvertCommand = require('./commands/timeConvert');
 
 loadDragon();
 loadProvinces();
 loadActivity();
 
-const COMMANDS = [dragonCommand, provincesCommand, activityCommand];
+const COMMANDS = [
+  dragonCommand,
+  provincesCommand,
+  activityCommand,
+  attackStatsCommand,
+  aidSummaryCommand,
+  espionageStatsCommand,
+  ritualStatsCommand,
+  provinceReportCommand,
+  kingdomReportCommand,
+  timeConvertCommand,
+];
 
 async function registerCommands() {
   const rest = new REST().setToken(process.env.DISCORD_TOKEN);
@@ -29,6 +53,13 @@ async function registerCommands() {
 const DRAGON_CHANNEL = 'dragons';
 const ACTIVITY_CHANNELS = ['dragons', 'aid', 'attackers', 'ritual', 'tms', 'general'];
 const SOURCE_BOT_USERNAME = 'utopiabot';
+
+const EVENT_CHANNELS = {
+  aid:       { parse: parseAidMessage,       add: addAid },
+  attackers: { parse: parseAttackMessage,    add: addAttack },
+  ritual:    { parse: parseRitualMessage,    add: addRitual },
+  tms:       { parse: parseEspionageMessage, add: addEspionage },
+};
 
 const client = new Client({
   intents: [
@@ -44,6 +75,7 @@ client.once('clientReady', async () => {
   const guild = client.guilds.cache.get(process.env.GUILD_ID);
   await backfill(guild, 'dragons');
   await backfillActivity(guild);
+  await backfillEvents(guild);
 });
 
 client.on('messageCreate', (message) => {
@@ -55,7 +87,7 @@ client.on('messageCreate', (message) => {
   if (channelName === DRAGON_CHANNEL) {
     const parsed = parseMessage(message.content);
     if (parsed) {
-      record(parsed, message.id);
+      record(parsed, message.id, message.createdAt.toISOString());
       console.log(`Recorded [${parsed.type}] for province: ${parsed.province}`);
     }
   }
@@ -65,6 +97,16 @@ client.on('messageCreate', (message) => {
     const events = parseActivityMessage(message.content, channelName);
     for (const { province, action } of events) {
       updateActivity(province, message.createdAt.toISOString(), action);
+    }
+  }
+
+  // Live event store updates for aid/attackers/ritual/tms
+  const eventConfig = EVENT_CHANNELS[channelName];
+  if (eventConfig) {
+    const timestamp = message.createdAt.toISOString();
+    const events = eventConfig.parse(message.content, timestamp);
+    for (const event of events) {
+      eventConfig.add(event);
     }
   }
 });

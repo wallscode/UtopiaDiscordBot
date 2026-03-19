@@ -40,7 +40,7 @@ async function backfill(guild, channelName) {
       if (msg.author.username !== SOURCE_BOT_USERNAME) continue;
       const parsed = parseMessage(msg.content);
       if (!parsed) continue;
-      record(parsed, msg.id);
+      record(parsed, msg.id, msg.createdAt.toISOString());
       processed++;
     }
 

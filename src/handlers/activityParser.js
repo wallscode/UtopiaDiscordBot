@@ -20,11 +20,11 @@ const BRACKET_PATTERNS = {
 // For tms and general, province name is not in brackets — use inventory lookup
 const INVENTORY_PATTERNS = {
   tms: [
-    { prefix: /:detective:[^:]+: /, action: 'espionage' },
-    { prefix: /:comet:[^:]+: /, action: 'cast spell' },
+    { prefix: /:detective::[a-z_]+: /, action: 'espionage' },
+    { prefix: /:comet::[a-z_]+: /, action: 'cast spell' },
   ],
   general: [
-    { prefix: /:star2::(?:green|broken)_heart: /, action: 'cast self-spell' },
+    { prefix: /:star2::[a-z_]+: /, action: 'cast self-spell' },
   ],
 };
 

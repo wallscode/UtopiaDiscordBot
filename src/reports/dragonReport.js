@@ -1,8 +1,8 @@
-const { getAll: getDragonData } = require('../handlers/dragonStore');
+const { getAggregated: getDragonData } = require('../handlers/dragonStore');
 const { getAll: getProvinces } = require('../handlers/provinceStore');
 
-function getMergedProvinces() {
-  const dragonData = getDragonData();
+function getMergedProvinces(periodHours) {
+  const dragonData = getDragonData(periodHours);
   const dragonMap = new Map(dragonData.map((p) => [p.province.toLowerCase(), p]));
   const inventory = getProvinces();
 
@@ -72,39 +72,42 @@ function buildAttackSection(provinces, nameWidth) {
   return lines.join('\n');
 }
 
-function generateDragonReport() {
-  const provinces = getMergedProvinces();
+function generateDragonReport(periodHours) {
+  const provinces = getMergedProvinces(periodHours);
   if (provinces.length === 0) {
     return ['No data recorded yet.'];
   }
 
   const nameWidth = Math.max(...provinces.map((p) => p.province.length)) + 2;
+  const periodLine = periodHours ? ` (last ${periodHours}h)` : '';
 
   return [
-    `**Dragon Summary**\n\`\`\`\n${buildDonationSection(provinces, nameWidth)}\n\`\`\``,
+    `**Dragon Summary${periodLine}**\n\`\`\`\n${buildDonationSection(provinces, nameWidth)}\n\`\`\``,
     `\`\`\`\n${buildAttackSection(provinces, nameWidth)}\n\`\`\``,
   ];
 }
 
-function generateForumReport() {
-  const provinces = getMergedProvinces();
+function generateForumReport(periodHours) {
+  const provinces = getMergedProvinces(periodHours);
   if (provinces.length === 0) {
     return ['No data recorded yet.'];
   }
 
   const nameWidth = Math.max(...provinces.map((p) => p.province.length)) + 2;
+  const periodLine = periodHours ? ` (last ${periodHours}h)` : '';
 
   return [
-    `\`\`\`\nDragon Summary\n\n${buildDonationSection(provinces, nameWidth)}\n\`\`\``,
+    `\`\`\`\nDragon Summary${periodLine}\n\n${buildDonationSection(provinces, nameWidth)}\n\`\`\``,
     `\`\`\`\n${buildAttackSection(provinces, nameWidth)}\n\`\`\``,
   ];
 }
 
-function generateMobileForumReport() {
-  const provinces = getMergedProvinces();
+function generateMobileForumReport(periodHours) {
+  const provinces = getMergedProvinces(periodHours);
   if (provinces.length === 0) {
     return ['No data recorded yet.'];
   }
+  const periodLine = periodHours ? ` (last ${periodHours}h)` : '';
 
   const nameWidth = Math.max(...provinces.map((p) => p.province.length)) + 2;
 
@@ -117,7 +120,7 @@ function generateMobileForumReport() {
     .split('\n').join('<br>');
 
   return [
-    `\`\`\`\n<pre><b>Dragon Summary</b><br><br>${donationLines}</pre>\n\`\`\``,
+    `\`\`\`\n<pre><b>Dragon Summary${periodLine}</b><br><br>${donationLines}</pre>\n\`\`\``,
     `\`\`\`\n<pre>${attackLines}</pre>\n\`\`\``,
   ];
 }
