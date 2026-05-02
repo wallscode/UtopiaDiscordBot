@@ -17,13 +17,16 @@ const BRACKET_PATTERNS = {
   ],
 };
 
-// For tms and general, province name is not in brackets — use inventory lookup
+// For tm-ops, general, and self-spells, province name is not in brackets — use inventory lookup
 const INVENTORY_PATTERNS = {
-  tms: [
+  'tm-ops': [
     { prefix: /:detective::[a-z_]+: /, action: 'espionage' },
     { prefix: /:comet::[a-z_]+: /, action: 'cast spell' },
   ],
   general: [
+    { prefix: /:star2::[a-z_]+: /, action: 'cast self-spell' },
+  ],
+  'self-spells': [
     { prefix: /:star2::[a-z_]+: /, action: 'cast self-spell' },
   ],
 };

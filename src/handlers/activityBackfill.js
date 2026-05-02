@@ -5,7 +5,7 @@ const SOURCE_BOT_USERNAME = 'utopiabot';
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
 const DISCORD_EPOCH = 1420070400000n;
 
-const SCAN_CHANNELS = ['dragons', 'aid', 'attackers', 'ritual', 'tms', 'general'];
+const SCAN_CHANNELS = ['dragons', 'aid', 'attackers', 'ritual', 'tm-ops', 'general', 'self-spells'];
 
 function timestampToSnowflake(ms) {
   return String((BigInt(ms) - DISCORD_EPOCH) << 22n);

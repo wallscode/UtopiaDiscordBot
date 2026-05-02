@@ -51,14 +51,14 @@ async function registerCommands() {
 }
 
 const DRAGON_CHANNEL = 'dragons';
-const ACTIVITY_CHANNELS = ['dragons', 'aid', 'attackers', 'ritual', 'tms', 'general'];
+const ACTIVITY_CHANNELS = ['dragons', 'aid', 'attackers', 'ritual', 'tm-ops', 'general', 'self-spells'];
 const SOURCE_BOT_USERNAME = 'utopiabot';
 
 const EVENT_CHANNELS = {
-  aid:       { parse: parseAidMessage,       add: addAid },
-  attackers: { parse: parseAttackMessage,    add: addAttack },
-  ritual:    { parse: parseRitualMessage,    add: addRitual },
-  tms:       { parse: parseEspionageMessage, add: addEspionage },
+  aid:        { parse: parseAidMessage,       add: addAid },
+  attackers:  { parse: parseAttackMessage,    add: addAttack },
+  ritual:     { parse: parseRitualMessage,    add: addRitual },
+  'tm-ops':   { parse: parseEspionageMessage, add: addEspionage },
 };
 
 const client = new Client({

@@ -15,7 +15,7 @@ const CHANNEL_CONFIG = {
   aid:       { parse: parseAidMessage,       add: addAid },
   attackers: { parse: parseAttackMessage,    add: addAttack },
   ritual:    { parse: parseRitualMessage,    add: addRitual },
-  tms:       { parse: parseEspionageMessage, add: addEspionage },
+  'tm-ops':  { parse: parseEspionageMessage, add: addEspionage },
 };
 
 function timestampToSnowflake(ms) {

@@ -1,7 +1,7 @@
 const { rebuild } = require('./provinceStore');
 
 const SOURCE_BOT_USERNAME = 'utopiabot';
-const SCAN_CHANNELS = ['dragons', 'aid', 'attackers', 'ritual'];
+const SCAN_CHANNELS = ['dragons', 'aid', 'attackers', 'ritual', 'self-spells'];
 const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
 const DISCORD_EPOCH = 1420070400000n;
 
@@ -11,6 +11,7 @@ const PATTERNS = [
   /:moneybag: (.+?) \[/,
   /sent .+? to (.+?) \[/,
   /:crossed_swords: (.+?) \[/,
+  /:star2:[^:]+: (.+?) \w+#/,
 ];
 
 function clean(content) {
