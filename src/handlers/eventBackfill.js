@@ -13,7 +13,7 @@ const DISCORD_EPOCH = 1420070400000n;
 
 const CHANNEL_CONFIG = {
   aid:       { parse: parseAidMessage,       add: addAid },
-  attackers: { parse: parseAttackMessage,    add: addAttack },
+  attacks:   { parse: parseAttackMessage,    add: addAttack },
   ritual:    { parse: parseRitualMessage,    add: addRitual },
   'tm-ops':  { parse: parseEspionageMessage, add: addEspionage },
 };

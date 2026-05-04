@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { parseAttackMessage } = require('../parsers/attackParser');
 
-const dumpPath = path.join(__dirname, '../../data/channel-dumps/attackers.json');
+const dumpPath = path.join(__dirname, '../../data/channel-dumps/attacks.json');
 const messages = JSON.parse(fs.readFileSync(dumpPath, 'utf8'));
 
 const botMessages = messages.filter((m) => m.author === 'utopiabot' || m.author?.username === 'utopiabot');

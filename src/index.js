@@ -51,12 +51,12 @@ async function registerCommands() {
 }
 
 const DRAGON_CHANNEL = 'dragons';
-const ACTIVITY_CHANNELS = ['dragons', 'aid', 'attackers', 'ritual', 'tm-ops', 'general', 'self-spells'];
+const ACTIVITY_CHANNELS = ['dragons', 'aid', 'attacks', 'ritual', 'tm-ops', 'general', 'self-spells'];
 const SOURCE_BOT_USERNAME = 'utopiabot';
 
 const EVENT_CHANNELS = {
   aid:        { parse: parseAidMessage,       add: addAid },
-  attackers:  { parse: parseAttackMessage,    add: addAttack },
+  attacks:    { parse: parseAttackMessage,    add: addAttack },
   ritual:     { parse: parseRitualMessage,    add: addRitual },
   'tm-ops':   { parse: parseEspionageMessage, add: addEspionage },
 };
@@ -100,7 +100,7 @@ client.on('messageCreate', (message) => {
     }
   }
 
-  // Live event store updates for aid/attackers/ritual/tms
+  // Live event store updates for aid/attacks/ritual/tm-ops
   const eventConfig = EVENT_CHANNELS[channelName];
   if (eventConfig) {
     const timestamp = message.createdAt.toISOString();

@@ -9,7 +9,7 @@ const BRACKET_PATTERNS = {
   aid: [
     { regex: /:moneybag: (.+?) \[/, action: 'sent aid' },
   ],
-  attackers: [
+  attacks: [
     { regex: /:crossed_swords: (.+?) \[/, action: 'military attack' },
   ],
   ritual: [
