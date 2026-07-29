@@ -15,14 +15,14 @@ function load() {
     const raw = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     provinces = raw.provinces || {};
     lastMessageId = raw.lastMessageId || null;
-    events = raw.events || [];
+    // events are not persisted — rebuilt from Discord on each startup
   } catch {
     console.warn('Could not read dragon.json, starting fresh.');
   }
 }
 
 function save() {
-  fs.writeFileSync(DATA_FILE, JSON.stringify({ lastMessageId, provinces, events }, null, 2));
+  fs.writeFileSync(DATA_FILE, JSON.stringify({ lastMessageId, provinces }, null, 2));
 }
 
 function getOrCreate(province) {
@@ -68,6 +68,20 @@ function record(parsed, messageId, timestamp) {
   save();
 }
 
+// Add an event-only entry without updating province totals.
+// Used during backfill for messages already counted in provinces.
+function addEventOnly(parsed, timestamp) {
+  events.push({
+    type: parsed.type,
+    province: parsed.province,
+    goldDonated: parsed.goldDonated || 0,
+    bushelsDonated: parsed.bushelsDonated || 0,
+    troopsSent: parsed.troopsSent || 0,
+    pointsWeakened: parsed.pointsWeakened || 0,
+    timestamp,
+  });
+}
+
 function getAll() {
   return Object.values(provinces);
 }
@@ -109,4 +123,4 @@ function reset() {
   save();
 }
 
-module.exports = { load, record, getAll, getAggregated, getLastMessageId, reset };
+module.exports = { load, record, addEventOnly, getAll, getAggregated, getLastMessageId, reset };
