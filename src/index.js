@@ -85,8 +85,8 @@ client.on('messageCreate', (message) => {
 
   // Dragon parsing (donations + attacks)
   if (channelName === DRAGON_CHANNEL) {
-    const parsed = parseMessage(message.content);
-    if (parsed) {
+    const parsedEntries = parseMessage(message.content);
+    for (const parsed of parsedEntries) {
       record(parsed, message.id, message.createdAt.toISOString());
       console.log(`Recorded [${parsed.type}] for province: ${parsed.province}`);
     }

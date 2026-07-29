@@ -40,16 +40,18 @@ async function backfill(guild, channelName) {
 
     for (const msg of sorted) {
       if (msg.author.username !== SOURCE_BOT_USERNAME) continue;
-      const parsed = parseMessage(msg.content);
-      if (!parsed) continue;
+      const parsedEntries = parseMessage(msg.content);
+      if (parsedEntries.length === 0) continue;
 
       const timestamp = msg.createdAt.toISOString();
-      if (!lastId || BigInt(msg.id) > BigInt(lastId)) {
-        // New message: update province totals and events
-        record(parsed, msg.id, timestamp);
-      } else {
-        // Already counted in province totals: only add to events for period queries
-        addEventOnly(parsed, timestamp);
+      for (const parsed of parsedEntries) {
+        if (!lastId || BigInt(msg.id) > BigInt(lastId)) {
+          // New message: update province totals and events
+          record(parsed, msg.id, timestamp);
+        } else {
+          // Already counted in province totals: only add to events for period queries
+          addEventOnly(parsed, timestamp);
+        }
       }
       processed++;
     }
