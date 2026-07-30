@@ -4,13 +4,13 @@
 
 const { getAll: getProvinces } = require('../handlers/provinceStore');
 
-const PREFIX_REGEX = /^:(?:detective|comet)::[a-z_]+: /;
+const PREFIX_REGEX = /^:(detective|comet)::[a-z_]+: /;
 const SUCCESS_REGEX = /:green_heart:/;
 const FAIL_REGEX = /:broken_heart:/;
 const MISSION_REGEX = /<<(.+?)\s*\|/;
 const TARGET_REGEX = /\|\s*(.+?)\s*>>/;
-const THIEVES_REGEX = /\(-(\d+) thieves\)/;
-const GOLD_REGEX = />>\s*([\d,]+)\s*\|/;
+const LOST_REGEX = /\(-(\d+) (thieves|wizards)\)/;
+const IMPACT_REGEX = />>\s*([\d,]+)\s*\|/;
 
 function clean(content) {
   return content.replace(/__/g, '').replace(/\*\*/g, '');
@@ -40,16 +40,18 @@ function parseEspionageLine(line) {
   const success = raw.includes(':green_heart:');
   const missionMatch = cleaned.match(MISSION_REGEX);
   const targetMatch = cleaned.match(TARGET_REGEX);
-  const thievesMatch = cleaned.match(THIEVES_REGEX);
-  const goldMatch = success ? cleaned.match(GOLD_REGEX) : null;
+  const lostMatch = cleaned.match(LOST_REGEX);
+  const impactMatch = success ? cleaned.match(IMPACT_REGEX) : null;
 
   return {
     province,
     missionType: missionMatch?.[1].trim() ?? 'unknown',
+    opIcon: prefixMatch[1],
     target: targetMatch?.[1].trim() ?? 'unknown',
     success,
-    thievesLost: thievesMatch ? parseInt(thievesMatch[1], 10) : 0,
-    goldStolen: goldMatch ? parseInt(goldMatch[1].replace(/,/g, ''), 10) : 0,
+    lostCount: lostMatch ? parseInt(lostMatch[1], 10) : 0,
+    lostUnit: lostMatch ? lostMatch[2] : null,
+    impactValue: impactMatch ? parseInt(impactMatch[1].replace(/,/g, ''), 10) : 0,
   };
 }
 

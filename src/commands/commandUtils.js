@@ -2,6 +2,10 @@ function formatNum(n) {
   return n.toLocaleString('en-US');
 }
 
+function formatAvg(n) {
+  return n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
 function periodLabel(hours) {
   if (!hours) return '';
   return ` (last ${hours}h)`;
@@ -26,4 +30,4 @@ async function sendChunked(interaction, text) {
   }
 }
 
-module.exports = { formatNum, periodLabel, sendChunked };
+module.exports = { formatNum, formatAvg, periodLabel, sendChunked };

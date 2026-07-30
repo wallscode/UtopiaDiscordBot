@@ -18,7 +18,7 @@ const provincesCommand = require('./commands/provinces');
 const activityCommand = require('./commands/activity');
 const attackStatsCommand = require('./commands/attackStats');
 const aidSummaryCommand = require('./commands/aidSummary');
-const espionageStatsCommand = require('./commands/espionageStats');
+const tmStatsCommand = require('./commands/tmStats');
 const ritualStatsCommand = require('./commands/ritualStats');
 const provinceReportCommand = require('./commands/provinceReport');
 const kingdomReportCommand = require('./commands/kingdomReport');
@@ -34,7 +34,7 @@ const COMMANDS = [
   activityCommand,
   attackStatsCommand,
   aidSummaryCommand,
-  espionageStatsCommand,
+  tmStatsCommand,
   ritualStatsCommand,
   provinceReportCommand,
   kingdomReportCommand,

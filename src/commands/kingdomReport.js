@@ -3,6 +3,7 @@ const { getAid, getAttacks, getRituals, getEspionage, filterByProvince } = requi
 const { getAll: getDragonData } = require('../handlers/dragonStore');
 const { getProvince: getActivity } = require('../handlers/activityStore');
 const { formatNum, sendChunked, periodLabel } = require('./commandUtils');
+const { classify, CATEGORY, KIND } = require('../parsers/missionTypes');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -111,10 +112,15 @@ module.exports = {
       const success = esp.filter((e) => e.success).length;
       const fail = esp.length - success;
       const rate = ((success / esp.length) * 100).toFixed(1);
-      const thievesLost = esp.reduce((s, e) => s + e.thievesLost, 0);
-      const goldStolen = esp.reduce((s, e) => s + e.goldStolen, 0);
+      const lost = esp.reduce((s, e) => s + e.lostCount, 0);
+      const goldStolen = esp.reduce((s, e) => {
+        if (!e.success) return s;
+        const meta = classify(e.missionType, e.opIcon);
+        return meta.category === CATEGORY.THIEVERY && meta.kind === KIND.CURRENCY && meta.unit === 'gc'
+          ? s + e.impactValue : s;
+      }, 0);
       lines.push(`  Total ops:      ${esp.length}  (${success} ok, ${fail} fail, ${rate}%)`);
-      lines.push(`  Thieves lost:   ${thievesLost}`);
+      lines.push(`  Lost:           ${lost}`);
       if (goldStolen > 0) lines.push(`  Gold stolen:    ${formatNum(goldStolen)}`);
     }
 

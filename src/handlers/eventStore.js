@@ -5,7 +5,7 @@ const events = {
   aid: [],        // { sender, receiver, resource, amount, timestamp }
   attacks: [],    // { attacker, target, kills, prisoners, learnPts, landsCapt, specCredits, troopLosses, timestamp }
   rituals: [],    // { province, castCount, timestamp }
-  espionage: [],  // { province, missionType, target, success, thievesLost, goldStolen, timestamp }
+  espionage: [],  // { province, missionType, opIcon, target, success, lostCount, lostUnit, impactValue, timestamp }
 };
 
 function addAid(event) { events.aid.push(event); }

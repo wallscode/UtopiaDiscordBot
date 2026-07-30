@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require('discord.js');
 const { getAid, getAttacks, getRituals, getEspionage, filterByProvince } = require('../handlers/eventStore');
 const { getAll: getDragonData } = require('../handlers/dragonStore');
 const { formatNum, sendChunked, periodLabel } = require('./commandUtils');
+const { classify, KIND } = require('../parsers/missionTypes');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -83,8 +84,10 @@ module.exports = {
       const esp = filterByProvince(getEspionage(period), 'province', province);
       for (const e of esp) {
         const result = e.success ? 'SUCCESS' : 'FAIL';
-        const extra = e.goldStolen > 0 ? `, ${formatNum(e.goldStolen)} gc stolen` :
-                      e.thievesLost > 0 ? `, lost ${e.thievesLost} thieves` : '';
+        const meta = classify(e.missionType, e.opIcon);
+        const extra = e.success && meta.kind !== KIND.NONE && e.impactValue > 0
+          ? `, ${formatNum(e.impactValue)} ${meta.unit}`
+          : !e.success && e.lostCount > 0 ? `, lost ${e.lostCount} ${e.lostUnit}` : '';
         entries.push({
           tag: 'TMS',
           date: e.timestamp.slice(0, 10),
