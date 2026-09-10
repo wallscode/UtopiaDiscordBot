@@ -7,6 +7,9 @@ const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
 const DUMP_DIR = path.join(__dirname, '../../data/channel-dumps');
 const DISCORD_EPOCH = 1420070400000n;
 
+// Read-only mirrors fed from another system, so nothing in them is a source of truth.
+const IGNORED_CHANNELS = ['announcements', 'main-chat', 'tm-group', 'attackers'];
+
 function timestampToSnowflake(ms) {
   return String((BigInt(ms) - DISCORD_EPOCH) << 22n);
 }
@@ -62,7 +65,9 @@ async function main() {
     }
 
     const cutoffMs = Date.now() - TWO_WEEKS_MS;
-    const textChannels = guild.channels.cache.filter((c) => c.isTextBased() && !c.isThread());
+    const textChannels = guild.channels.cache.filter(
+      (c) => c.isTextBased() && !c.isThread() && !IGNORED_CHANNELS.includes(c.name)
+    );
 
     console.log(`Found ${textChannels.size} text channels. Dumping messages from the last 2 weeks...\n`);
 
