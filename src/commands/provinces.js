@@ -44,7 +44,9 @@ module.exports = {
       }
       const added = addProvince(name);
       return interaction.reply(
-        added ? `Added province: **${name}**` : `**${name}** is already in the inventory.`
+        added
+          ? `Added province: **${name}**\nNote: manual additions are cleared by the next \`/provinces action:refresh\`.`
+          : `**${name}** is already in the inventory.`
       );
     }
 
@@ -58,7 +60,9 @@ module.exports = {
       }
       const removed = removeProvince(name);
       return interaction.reply(
-        removed ? `Removed province: **${name}**` : `**${name}** was not found in the inventory.`
+        removed
+          ? `Removed province: **${name}**\nNote: refresh rebuilds the list from history, so this province returns if it is still active.`
+          : `**${name}** was not found in the inventory.`
       );
     }
 
@@ -68,8 +72,18 @@ module.exports = {
         return interaction.reply({ content: 'You do not have permission to refresh the province list.', ephemeral: true });
       }
       await interaction.deferReply();
-      const count = await scanProvinces(interaction.guild);
-      return interaction.editReply(`Province list rebuilt. ${count} provinces found.`);
+      const { count, unresolved } = await scanProvinces(interaction.guild);
+      let reply = `Province list rebuilt. ${count} provinces found.`;
+      if (unresolved.length) {
+        const shown = unresolved.slice(0, 10);
+        reply += `\n\nCould not identify ${unresolved.length} entr${unresolved.length === 1 ? 'y' : 'ies'} ` +
+          `(custom nickname, province name is the leading part). Add manually if missing:\n` +
+          `\`\`\`\n${shown.join('\n')}\n\`\`\``;
+        if (unresolved.length > shown.length) {
+          reply += `…and ${unresolved.length - shown.length} more (see bot log).`;
+        }
+      }
+      return interaction.editReply(reply);
     }
 
     // --- DEFAULT: list ---
