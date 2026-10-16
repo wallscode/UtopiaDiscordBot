@@ -88,8 +88,11 @@ module.exports = {
       recvMap.get(rk)[e.resource] += e.amount;
     }
 
-    const sentList = [...sentMap.values()].sort((a, b) => (b.gold + b.bushels) - (a.gold + a.bushels));
-    const recvList = [...recvMap.values()].sort((a, b) => (b.gold + b.bushels) - (a.gold + a.bushels));
+    const sortKey = typeFilter
+      ? (r) => r[typeFilter]
+      : (r) => r.gold + r.bushels;
+    const sentList = [...sentMap.values()].sort((a, b) => sortKey(b) - sortKey(a));
+    const recvList = [...recvMap.values()].sort((a, b) => sortKey(b) - sortKey(a));
     const nameWidth = Math.max(...sentList.map((r) => r.province.length)) + 2;
 
     const resources = typeFilter ? [typeFilter] : RESOURCES;
