@@ -99,15 +99,18 @@ module.exports = {
 
     // Rituals
     if (typeFilter === 'all' || typeFilter === 'rituals') {
-      const rit = filterByProvince(getRituals(period), 'province', province);
-      for (const e of rit) {
+      // Note: castCount from the parser is a kingdom-wide running counter, not
+      // per-province, so the per-province cast number comes from event order.
+      const rit = filterByProvince(getRituals(period), 'province', province)
+        .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+      rit.forEach((e, i) => {
         entries.push({
           tag: 'RITUAL',
           date: e.timestamp.slice(0, 10),
           ts: e.timestamp,
-          text: `cast ritual (${e.castCount} total)`,
+          text: `cast ritual (#${i + 1})`,
         });
-      }
+      });
     }
 
     const timedEntries = entries.filter((e) => e.ts).sort((a, b) => new Date(b.ts) - new Date(a.ts));

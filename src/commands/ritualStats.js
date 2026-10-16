@@ -26,22 +26,23 @@ module.exports = {
       const lines = [
         `Ritual History: ${province}${periodLabel(period)}`,
         '-'.repeat(40),
-        ...events.map((e) => {
+        ...events.map((e, i) => {
           const date = e.timestamp.slice(0, 10);
-          return `${date}  cast ritual (${e.castCount} total)`;
+          return `${date}  cast ritual (#${i + 1})`;
         }),
       ];
       return sendChunked(interaction, lines.join('\n'));
     }
 
     // Kingdom-wide summary
+    // Note: castCount from the parser is a kingdom-wide running counter, not a
+    // per-province total, so per-province totals come from counting events instead.
     const totals = new Map();
     for (const r of rituals) {
       const key = r.province.toLowerCase();
       const existing = totals.get(key);
-      if (!existing || r.castCount > existing.castCount) {
-        totals.set(key, { province: r.province, castCount: r.castCount });
-      }
+      if (existing) existing.castCount += 1;
+      else totals.set(key, { province: r.province, castCount: 1 });
     }
 
     // Include all inventory provinces with 0 if not present

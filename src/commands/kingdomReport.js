@@ -133,9 +133,7 @@ module.exports = {
     if (rit.length === 0) {
       lines.push('  No ritual data');
     } else {
-      const maxCast = Math.max(...rit.map((r) => r.castCount));
-      lines.push(`  Cast events:    ${rit.length}`);
-      lines.push(`  Total casts:    ${formatNum(maxCast)}`);
+      lines.push(`  Total casts:    ${formatNum(rit.length)}`);
     }
 
     return sendChunked(interaction, lines.join('\n'));
