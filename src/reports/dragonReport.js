@@ -63,12 +63,18 @@ function buildAttackSection(provinces, nameWidth) {
   });
 
   const lines = ['Troops Sent and Points Weakened:', '-'.repeat(40)];
+  let totalPoints = 0;
+  let totalTroops = 0;
 
   for (const p of sorted) {
     const name = p.province.padEnd(nameWidth);
     lines.push(`${name} Points: ${formatNum(p.pointsWeakened)}   Troops: ${formatNum(p.troopsSent)}`);
+    totalPoints += p.pointsWeakened;
+    totalTroops += p.troopsSent;
   }
 
+  lines.push('');
+  lines.push(`${'Total'.padEnd(nameWidth)} Points: ${formatNum(totalPoints)}   Troops: ${formatNum(totalTroops)}`);
   return lines.join('\n');
 }
 
