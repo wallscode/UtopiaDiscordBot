@@ -1,7 +1,9 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
 const { parseMessage, parseDragonLines } = require('./handlers/dragonParser');
-const { load: loadDragon, record } = require('./handlers/dragonStore');
+const dragonStore = require('./handlers/dragonStore');
+const { load: loadDragon, record } = dragonStore;
+const { ensureDragonAge } = require('./war/dragonAge');
 const { load: loadProvinces } = require('./handlers/provinceStore');
 const { load: loadActivity, update: updateActivity } = require('./handlers/activityStore');
 const { backfill } = require('./handlers/backfill');
@@ -95,6 +97,17 @@ client.once('clientReady', async () => {
   await backfillEvents(guild);
 
   warData.ages.on('pending', () => promptAgeChange(warData.ages));
+  // /dragon-stats' running totals: this age only (after the backfill, so the
+  // event log is complete), and fresh again whenever a new age is confirmed.
+  const keepDragonAge = () => {
+    try {
+      ensureDragonAge({ ages: warData.ages, eventLog: warData.eventLog, store: dragonStore });
+    } catch (err) {
+      console.error('Dragon totals: could not start the new age:', err);
+    }
+  };
+  keepDragonAge();
+  warData.ages.on('age-changed', keepDragonAge);
   warData.rebuildWars();
   warData.tick();
   setInterval(warData.tick, WAR_INBOX_INTERVAL_MS);

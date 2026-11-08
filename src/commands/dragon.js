@@ -3,6 +3,7 @@ const { generateDragonReport, generateForumReport, generateMobileForumReport } =
 const { lookupWar } = require('../war/warLookup');
 const { summarizeDragons } = require('../war/warSummary');
 const { warRange } = require('../war/reportFormat');
+const { splitForDiscord } = require('./commandUtils');
 
 // Totals and title for one war, from its stored record: donations and dragon
 // attacks inside the war (which ends at the tick starting the post-war
@@ -56,10 +57,11 @@ module.exports = {
       source = warSource(found.war);
     }
 
-    const messages =
+    // Long reports (many provinces) are split to fit Discord's limit.
+    const messages = splitForDiscord(
       format === 'forum' ? generateForumReport(period, source) :
       format === 'mobile-forum' ? generateMobileForumReport(period, source) :
-      generateDragonReport(period, source);
+      generateDragonReport(period, source));
 
     await interaction.reply({ content: messages[0] });
     for (let i = 1; i < messages.length; i++) {

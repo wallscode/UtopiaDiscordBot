@@ -819,3 +819,85 @@ test('/dragon-stats war report: war totals in every format, titled with the war'
   assert.equal(warSource({ ...war, ended: false, endDate: null, events: [] }).label,
     ' — war vs 6:7 (Feb 20 YR2 – ongoing, so far)');
 });
+
+// ── Discord's 2,000-character limit ─────────────────────────────────────
+
+const { splitForDiscord } = require('../src/commands/commandUtils');
+
+test('splitForDiscord keeps every message under the limit with blocks intact', () => {
+  const rows = Array.from({ length: 60 }, (_, i) => `Province ${String(i).padStart(2)}             GC: 1,000,000   Bushels: 50,000`);
+  const code = `**Dragon Summary**\n\`\`\`\n${rows.join('\n')}\n\`\`\``;
+  const pre = `\`\`\`\n<pre><b>Dragon Summary</b><br><br>${rows.join('<br>')}</pre>\n\`\`\``;
+  for (const message of [code, pre]) {
+    const parts = splitForDiscord([message]);
+    assert.ok(parts.length > 1);
+    for (const p of parts) {
+      assert.ok(p.length <= 2000, `${p.length} chars`);
+      assert.equal((p.match(/```/g) || []).length % 2, 0, 'code fences balanced');
+      assert.equal((p.match(/<pre>/g) || []).length, (p.match(/<\/pre>/g) || []).length, '<pre> balanced');
+    }
+    for (const row of rows) assert.ok(parts.some((p) => p.includes(row)), 'no row lost');
+  }
+  assert.deepEqual(splitForDiscord(['short']), ['short']);
+});
+
+// ── /dragon-stats totals per age ────────────────────────────────────────
+
+const { ensureDragonAge, dragonTotalsSince } = require('../src/war/dragonAge');
+
+function fakeDragonStore(age) {
+  return {
+    age, started: null,
+    getAge() { return this.age; },
+    startAge(newAge, totals, archive) { this.age = newAge; this.started = { newAge, totals, archive }; },
+  };
+}
+
+test('dragon totals restart from the event log at the age start', () => {
+  const dir = tmpDir();
+  const ages = newAges(dir);
+  const ageStart = Date.now() - 5 * 24 * H;
+  ages.state.tickZeroAt = new Date(ageStart).toISOString();
+  const log = new EventLog({ dataDir: dir, retentionDays: 30 });
+  log.load();
+  const dragon = (line, t, id) => parseDragonLines(line, new Date(t).toISOString()).forEach((e, i) => log.append('dragon', id, i, e));
+  dragon(':dragon_face: __DRAGON__ Old Car [old#] donated __500,000 gold coins__ to fund dragon!', ageStart - 2 * H, 'old');
+  dragon(':dragon_face: __DRAGON__ Olko [olk#] donated __75,000 gold coins__ to fund dragon!', ageStart + 3 * H, 'n1');
+  dragon(':dragon_face: __DRAGON__ Olko [olk#] donated __20,000 bushels__ to fund dragon!\n'
+    + ':dragon_face: __DRAGON__ Joker [jok#] sent __1,200__ troops and weakened dragon by __9,876__ points!', ageStart + 30 * H, 'n2');
+
+  const quietLog = { log() {}, warn() {} };
+  const untagged = fakeDragonStore(null);
+  assert.match(ensureDragonAge({ ages, eventLog: log, store: untagged, log: quietLog }), /started age 117/);
+  assert.equal(untagged.started.archive, 'dragon-before-age-117.json');
+  const byName = Object.fromEntries(untagged.started.totals.map((t) => [t.province, t]));
+  assert.deepEqual(Object.keys(byName).sort(), ['Joker', 'Olko'], "last age's province is gone");
+  assert.equal(byName.Olko.goldDonated, 75000);
+  assert.equal(byName.Olko.bushelsDonated, 20000);
+  assert.equal(byName.Joker.pointsWeakened, 9876);
+
+  // Already on this age: nothing happens.
+  assert.equal(ensureDragonAge({ ages, eventLog: log, store: untagged, log: quietLog }), null);
+
+  // A later age change archives under the old age number.
+  const tagged = fakeDragonStore(116);
+  ensureDragonAge({ ages, eventLog: log, store: tagged, log: quietLog });
+  assert.equal(tagged.started.archive, 'dragon-age-116.json');
+
+  // No known age start yet: leave the totals alone.
+  ages.state.tickZeroAt = null;
+  assert.equal(ensureDragonAge({ ages, eventLog: log, store: fakeDragonStore(null), log: quietLog }), null);
+  assert.equal(dragonTotalsSince(log, ageStart).length, 2);
+});
+
+test('confirming a new age reports the old age number too', () => {
+  const ages = newAges(tmpDir());
+  ages.observeClock(clockAt('July 20 of YR8', dayStart('July 20 of YR8')));
+  const newT0 = dayStart('July 20 of YR8') + 72 * H;
+  ages.observeClock(clockAt('January 2 of YR0', newT0 + H));
+  ages.observeClock(clockAt('January 3 of YR0', newT0 + 2 * H));
+  let seen;
+  ages.on('age-changed', (newAge, oldAge) => { seen = [newAge, oldAge]; });
+  ages.confirmAgeChange();
+  assert.deepEqual(seen, [118, 117]);
+});

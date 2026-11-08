@@ -181,6 +181,7 @@ class AgeManager extends EventEmitter {
     const p = this.state.pending;
     if (!p) throw new Error('No age change is pending.');
     const newAge = Number.isInteger(age) ? age : p.proposedAge;
+    const oldAge = this.state.currentAge;
     Object.assign(this.state, {
       currentAge: newAge,
       tickZeroAt: p.tickZeroAt,
@@ -191,7 +192,7 @@ class AgeManager extends EventEmitter {
     });
     this.save();
     fs.mkdirSync(path.join(this.ageDir(newAge), 'wars'), { recursive: true });
-    this.emit('age-changed', newAge);
+    this.emit('age-changed', newAge, oldAge);
     return newAge;
   }
 

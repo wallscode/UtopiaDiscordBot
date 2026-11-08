@@ -6,6 +6,10 @@ const DATA_FILE = path.join(DATA_DIR, 'dragon.json');
 
 let provinces = {};
 let lastMessageId = null;
+// The Utopia age the totals belong to (null: an older file from before ages
+// were tracked). See war/dragonAge.js, which starts the totals afresh at
+// each new age.
+let age = null;
 let events = []; // { type, province, goldDonated, bushelsDonated, troopsSent, pointsWeakened, timestamp }
 
 function load() {
@@ -15,6 +19,7 @@ function load() {
     const raw = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     provinces = raw.provinces || {};
     lastMessageId = raw.lastMessageId || null;
+    age = raw.age ?? null;
     // events are not persisted — rebuilt from Discord on each startup
   } catch {
     console.warn('Could not read dragon.json, starting fresh.');
@@ -22,7 +27,7 @@ function load() {
 }
 
 function save() {
-  fs.writeFileSync(DATA_FILE, JSON.stringify({ lastMessageId, provinces }, null, 2));
+  fs.writeFileSync(DATA_FILE, JSON.stringify({ age, lastMessageId, provinces }, null, 2));
 }
 
 function getOrCreate(province) {
@@ -117,10 +122,37 @@ function getLastMessageId() {
   return lastMessageId;
 }
 
+function getAge() {
+  return age;
+}
+
+// Start the totals for a new age: keep a copy of the current file as
+// `archiveName` (in data/), then replace the totals with `totals` (per
+// province, e.g. rebuilt from the war event log since the age began).
+// lastMessageId is kept, so the startup backfill never counts an older
+// message again.
+function startAge(newAge, totals, archiveName) {
+  if (fs.existsSync(DATA_FILE)) fs.copyFileSync(DATA_FILE, path.join(DATA_DIR, archiveName));
+  age = newAge;
+  provinces = {};
+  for (const t of totals) {
+    provinces[t.province] = {
+      province: t.province,
+      goldDonated: t.goldDonated || 0,
+      bushelsDonated: t.bushelsDonated || 0,
+      troopsSent: t.troopsSent || 0,
+      pointsWeakened: t.pointsWeakened || 0,
+    };
+  }
+  save();
+}
+
 function reset() {
   provinces = {};
   lastMessageId = null;
   save();
 }
 
-module.exports = { load, record, addEventOnly, getAll, getAggregated, getLastMessageId, reset };
+module.exports = {
+  load, record, addEventOnly, getAll, getAggregated, getLastMessageId, reset, getAge, startAge,
+};
