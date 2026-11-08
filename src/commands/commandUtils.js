@@ -1,3 +1,11 @@
+const ADMIN_ROLE_NAME = process.env.ADMIN_ROLE_NAME || 'Admin';
+
+function isAdmin(member) {
+  return Boolean(member?.roles?.cache?.some(
+    (role) => role.name.toLowerCase() === ADMIN_ROLE_NAME.toLowerCase()
+  ));
+}
+
 function formatNum(n) {
   return n.toLocaleString('en-US');
 }
@@ -30,4 +38,4 @@ async function sendChunked(interaction, text) {
   }
 }
 
-module.exports = { formatNum, formatAvg, periodLabel, sendChunked };
+module.exports = { formatNum, formatAvg, periodLabel, sendChunked, isAdmin };

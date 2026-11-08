@@ -16,8 +16,8 @@ function parseInGameDate(str) {
   const day = parseInt(match[2], 10);
   const year = parseInt(match[3], 10);
 
+  // Ages start at YR0, so year 0 is valid.
   if (day < 1 || day > 24) return null;
-  if (year < 1) return null;
 
   return { month: monthIndex, day, year };
 }

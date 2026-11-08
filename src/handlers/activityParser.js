@@ -17,17 +17,18 @@ const BRACKET_PATTERNS = {
   ],
 };
 
-// For tm-ops, general, and self-spells, province name is not in brackets — use inventory lookup
+// For tm-ops, general, and self-spells, province name is not in brackets — use inventory lookup.
+// Some lines have two spaces after the emoji, hence \s+.
 const INVENTORY_PATTERNS = {
   'tm-ops': [
-    { prefix: /:detective::[a-z_]+: /, action: 'espionage' },
-    { prefix: /:comet::[a-z_]+: /, action: 'cast spell' },
+    { prefix: /:detective::[a-z_]+:\s+/, action: 'espionage' },
+    { prefix: /:comet::[a-z_]+:\s+/, action: 'cast spell' },
   ],
   general: [
-    { prefix: /:star2::[a-z_]+: /, action: 'cast self-spell' },
+    { prefix: /:star2::[a-z_]+:\s+/, action: 'cast self-spell' },
   ],
   'self-spells': [
-    { prefix: /:star2::[a-z_]+: /, action: 'cast self-spell' },
+    { prefix: /:star2::[a-z_]+:\s+/, action: 'cast self-spell' },
   ],
 };
 

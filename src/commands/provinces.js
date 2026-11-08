@@ -1,14 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { getAll, getUpdatedAt, addProvince, removeProvince } = require('../handlers/provinceStore');
 const { scanProvinces } = require('../handlers/provinceScanner');
-
-const ADMIN_ROLE_NAME = process.env.ADMIN_ROLE_NAME || 'Admin';
-
-function isAdmin(member) {
-  return member.roles.cache.some(
-    (role) => role.name.toLowerCase() === ADMIN_ROLE_NAME.toLowerCase()
-  );
-}
+const { isAdmin } = require('./commandUtils');
 
 module.exports = {
   data: new SlashCommandBuilder()

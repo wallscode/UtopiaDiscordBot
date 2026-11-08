@@ -104,12 +104,14 @@ function parseAttackLine(line) {
   return event;
 }
 
+// `line` is the event's line number within the message, a stable identity
+// for the event (see war/eventLog.js).
 function parseAttackMessage(content, timestamp) {
   const results = [];
-  for (const line of content.split('\n')) {
+  content.split('\n').forEach((line, i) => {
     const event = parseAttackLine(line.trim());
-    if (event) results.push({ ...event, timestamp });
-  }
+    if (event) results.push({ ...event, line: i, timestamp });
+  });
   return results;
 }
 

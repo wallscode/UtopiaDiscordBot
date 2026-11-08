@@ -13,6 +13,9 @@ const { parseAidMessage } = require('./parsers/aidParser');
 const { parseAttackMessage } = require('./parsers/attackParser');
 const { parseRitualMessage } = require('./parsers/ritualParser');
 const { parseEspionageMessage } = require('./parsers/espionageParser');
+const { parseSelfSpellMessage } = require('./parsers/selfSpellParser');
+const warData = require('./war/context');
+const { promptAgeChange, promptCleanup } = require('./war/terminalPrompt');
 const dragonCommand = require('./commands/dragon');
 const provincesCommand = require('./commands/provinces');
 const activityCommand = require('./commands/activity');
@@ -23,10 +26,19 @@ const ritualStatsCommand = require('./commands/ritualStats');
 const provinceReportCommand = require('./commands/provinceReport');
 const kingdomReportCommand = require('./commands/kingdomReport');
 const timeConvertCommand = require('./commands/timeConvert');
+const warReportCommand = require('./commands/warReport');
+const ageReportCommand = require('./commands/ageReport');
+const { ageConfirm: ageConfirmCommand, ageCleanup: ageCleanupCommand } = require('./commands/ageAdmin');
 
 loadDragon();
 loadProvinces();
 loadActivity();
+warData.init();
+
+// Utopia-Automation drops war news and Throne clock readings into
+// data/inbox/ once a cycle; this picks them up.
+const WAR_INBOX_INTERVAL_MS = 2 * 60 * 1000;
+const EVENT_LOG_PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 const COMMANDS = [
   dragonCommand,
@@ -39,6 +51,10 @@ const COMMANDS = [
   provinceReportCommand,
   kingdomReportCommand,
   timeConvertCommand,
+  warReportCommand,
+  ageReportCommand,
+  ageConfirmCommand,
+  ageCleanupCommand,
 ];
 
 async function registerCommands() {
@@ -59,6 +75,7 @@ const EVENT_CHANNELS = {
   attacks:    { parse: parseAttackMessage,    add: addAttack },
   ritual:     { parse: parseRitualMessage,    add: addRitual },
   'tm-ops':   { parse: parseEspionageMessage, add: addEspionage },
+  'self-spells': { parse: parseSelfSpellMessage, add: null },
 };
 
 const client = new Client({
@@ -76,6 +93,14 @@ client.once('clientReady', async () => {
   await backfill(guild, 'dragons');
   await backfillActivity(guild);
   await backfillEvents(guild);
+
+  warData.ages.on('pending', () => promptAgeChange(warData.ages));
+  warData.rebuildWars();
+  warData.tick();
+  setInterval(warData.tick, WAR_INBOX_INTERVAL_MS);
+  setInterval(() => warData.eventLog.prune(), EVENT_LOG_PRUNE_INTERVAL_MS);
+  if (warData.ages.pending) await promptAgeChange(warData.ages);
+  await promptCleanup(warData.ages);
 });
 
 client.on('messageCreate', (message) => {
@@ -100,14 +125,18 @@ client.on('messageCreate', (message) => {
     }
   }
 
-  // Live event store updates for aid/attacks/ritual/tm-ops
+  // Live event store updates for aid/attacks/ritual/tm-ops/self-spells, and
+  // the on-disk war event log
   const eventConfig = EVENT_CHANNELS[channelName];
   if (eventConfig) {
     const timestamp = message.createdAt.toISOString();
     const events = eventConfig.parse(message.content, timestamp);
-    for (const event of events) {
-      eventConfig.add(event);
+    if (eventConfig.add) {
+      for (const event of events) {
+        eventConfig.add(event);
+      }
     }
+    warData.logMessageEvents(channelName, message.id, events);
   }
 });
 

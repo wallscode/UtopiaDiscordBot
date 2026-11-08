@@ -4,7 +4,8 @@
 
 const { getAll: getProvinces } = require('../handlers/provinceStore');
 
-const PREFIX_REGEX = /^:(detective|comet)::[a-z_]+: /;
+// One or more spaces: some provinces' lines have two after the emoji.
+const PREFIX_REGEX = /^:(detective|comet)::[a-z_]+:\s+/;
 const SUCCESS_REGEX = /:green_heart:/;
 const FAIL_REGEX = /:broken_heart:/;
 const MISSION_REGEX = /<<(.+?)\s*\|/;
@@ -55,12 +56,14 @@ function parseEspionageLine(line) {
   };
 }
 
+// `line` is the event's line number within the message, a stable identity
+// for the event (see war/eventLog.js).
 function parseEspionageMessage(content, timestamp) {
   const results = [];
-  for (const line of content.split('\n')) {
+  content.split('\n').forEach((line, i) => {
     const event = parseEspionageLine(line.trim());
-    if (event) results.push({ ...event, timestamp });
-  }
+    if (event) results.push({ ...event, line: i, timestamp });
+  });
   return results;
 }
 
