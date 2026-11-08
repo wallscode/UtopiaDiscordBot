@@ -554,3 +554,59 @@ test('province table: most hits, then most acres, then most ops', () => {
   const order = text.split('\n').filter((l) => /^(Few|Tie|Most|Same)/.test(l)).map((l) => l.slice(0, 20).trim());
   assert.deepEqual(order, ['Most Hits', 'Same Hits More Acres', 'Tie More Ops', 'Tie Fewer Ops', 'Few Hits Big Land']);
 });
+
+// ── /tm-stats source selection ──────────────────────────────────────────
+
+const { selectOps } = require('../src/commands/tmStats');
+
+test('/tm-stats: current/last war by default, a named war, or a period', () => {
+  const dir = tmpDir();
+  const ages = newAges(dir);
+  const store = new WarStore({ dataDir: dir, ages, log: quiet });
+  const recentCalls = [];
+  const deps = {
+    warStore: store,
+    refresh: () => {},
+    currentAge: () => 117,
+    recent: (hours) => { recentCalls.push(hours); return [{ province: 'Joker', from: 'memory' }]; },
+  };
+  const op = (id, target, t) => ({ id, kind: 'espionage', province: 'Joker', missionType: 'fireball', opIcon: 'comet', target, success: true, lostCount: 0, impactValue: 1, discordTime: t });
+  const put = (key, opponent, startDate, ended, events) => {
+    const file = path.join(dir, 'ages', '117', 'wars', `${key}.json`);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ key, age: 117, opponent, startDate, endDate: ended ? 'April 21 of YR2' : null, ended, news: [], events }));
+  };
+
+  // No war recorded yet: everything in memory.
+  let r = selectOps({}, deps);
+  assert.match(r.label, /no war recorded/);
+  assert.deepEqual(recentCalls, [null]);
+
+  put('a', '5:12', 'June 5 of YR0', true, [op('e1', 'Fortnite (5:12)', '2026-10-26T00:00:00Z')]);
+  put('b', '6:7', 'February 20 of YR2', true, [
+    op('e2', 'Plague Doctor (6:7)', '2026-11-06T00:00:00Z'),
+    op('e3', 'Lich (6:7)', '2026-11-06T01:00:00Z'),
+    { id: 's1', kind: 'selfspell', province: 'Joker', spell: 'patriotism', discordTime: '2026-11-06T00:00:00Z' },
+  ]);
+
+  r = selectOps({}, deps);
+  assert.equal(r.ops.length, 2, 'the last war, tm-ops only');
+  assert.equal(r.ops[0].timestamp, '2026-11-06T00:00:00Z');
+  assert.match(r.label, /war vs 6:7 \(Feb 20 YR2 – Apr 21 YR2\)$/);
+
+  r = selectOps({ war: '5:12' }, deps);
+  assert.equal(r.ops.length, 1);
+  assert.match(r.label, /war vs 5:12/);
+
+  put('c', '2:3', 'May 9 of YR2', false, [op('e4', 'X (2:3)', '2026-11-08T03:00:00Z')]);
+  r = selectOps({}, deps);
+  assert.match(r.label, /war vs 2:3 \(May 9 YR2 – ongoing, so far\)/, 'at war: the running war');
+
+  r = selectOps({ period: 6 }, deps);
+  assert.equal(r.ops[0].from, 'memory');
+  assert.equal(r.label, ' (last 6h)');
+
+  assert.match(selectOps({ war: '9:9' }, deps).error, /No war vs 9:9/);
+  assert.match(selectOps({ war: '69' }, deps).error, /isn't a kingdom location/);
+  assert.match(selectOps({ war: '6:7', period: 6 }, deps).error, /not both/);
+});

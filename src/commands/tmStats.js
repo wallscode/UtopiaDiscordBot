@@ -3,6 +3,9 @@ const { getEspionage, filterByProvince } = require('../handlers/eventStore');
 const { getAll: getProvinces } = require('../handlers/provinceStore');
 const { formatNum, formatAvg, sendChunked, periodLabel } = require('./commandUtils');
 const { classify, CATEGORY, KIND } = require('../parsers/missionTypes');
+const warData = require('../war/context');
+const { OPPONENT_RE } = require('../war/warStore');
+const { warRange } = require('../war/reportFormat');
 
 const SECTION_ORDER = [CATEGORY.THIEVERY, CATEGORY.SPELL, CATEGORY.INTEL];
 const SECTION_TITLES = {
@@ -18,6 +21,36 @@ function categoryForFilter(typeFilter) {
   return null;
 }
 
+// Which ops to show. period wins: the last N hours, from the in-memory store.
+// Otherwise a war's ops from its stored record: the named war, or by default
+// the war still running, else the most recent one. With no war recorded at
+// all, everything in memory (the last two weeks).
+// Returns { ops, label } or { error }. `deps` is for tests.
+function selectOps({ war, period }, deps = {}) {
+  const { warStore = warData.warStore, refresh = warData.tick,
+    currentAge = () => warData.ages.currentAge, recent = getEspionage } = deps;
+  if (war && period) return { error: 'Use either `war` or `period`, not both.' };
+  if (war && !OPPONENT_RE.test(war)) {
+    return { error: `"${war}" isn't a kingdom location. Use the form N:N, e.g. \`6:7\`.` };
+  }
+  if (period) return { ops: recent(period), label: periodLabel(period) };
+
+  refresh();
+  let record;
+  if (war) {
+    [record] = warStore.findWars(war);
+    if (!record) return { error: `No war vs ${war} recorded in age ${currentAge()}.` };
+  } else {
+    record = warStore.latestWar();
+    if (!record) return { ops: recent(null), label: ' (last 14 days; no war recorded yet)' };
+  }
+  const ops = record.events
+    .filter((e) => e.kind === 'espionage')
+    .map((e) => ({ ...e, timestamp: e.discordTime }));
+  const running = record.ended ? '' : ', so far';
+  return { ops, label: ` — war vs ${record.opponent} (${warRange(record)}${running})` };
+}
+
 function formatRow(r, labelWidth) {
   const pct = r.count > 0 ? ((r.success / r.count) * 100).toFixed(0) : '0';
   const base = `  ${String(r.count).padStart(2)}  ${r.meta.label.padEnd(labelWidth)} ${String(r.success).padStart(2)} ok  ${String(r.fail).padStart(2)} fail  ${pct}%`;
@@ -28,11 +61,13 @@ function formatRow(r, labelWidth) {
 }
 
 module.exports = {
+  selectOps,
   data: new SlashCommandBuilder()
     .setName('tm-stats')
-    .setDescription('Show thievery, spell, and intel statistics from tm-ops')
+    .setDescription('Thievery, spell and intel stats: the current or last war by default')
     .addStringOption((o) => o.setName('province').setDescription('Filter to one province'))
-    .addIntegerOption((o) => o.setName('period').setDescription('Only include events from the last N hours').setMinValue(1))
+    .addStringOption((o) => o.setName('war').setDescription('A war this age by enemy kingdom, e.g. 6:7'))
+    .addIntegerOption((o) => o.setName('period').setDescription('Instead of a war: the last N hours').setMinValue(1))
     .addStringOption((o) =>
       o.setName('type').setDescription('Filter by operation category')
         .addChoices(
@@ -46,10 +81,14 @@ module.exports = {
   async execute(interaction) {
     const province = interaction.options.getString('province');
     const period = interaction.options.getInteger('period');
+    const war = interaction.options.getString('war')?.trim() || null;
     const typeFilter = interaction.options.getString('type') || 'all';
     const categoryFilter = categoryForFilter(typeFilter);
 
-    let tmOps = getEspionage(period);
+    const selected = selectOps({ war, period });
+    if (selected.error) return interaction.reply({ content: selected.error, ephemeral: true });
+    const { label } = selected;
+    let tmOps = selected.ops;
     if (categoryFilter) {
       tmOps = tmOps.filter((e) => classify(e.missionType, e.opIcon).category === categoryFilter);
     }
@@ -59,7 +98,7 @@ module.exports = {
         .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
       if (events.length === 0) {
-        return interaction.reply(`No tm-ops data for **${province}**${periodLabel(period)}.`);
+        return interaction.reply(`No tm-ops data for **${province}**${label}.`);
       }
 
       const success = events.filter((e) => e.success).length;
@@ -88,7 +127,7 @@ module.exports = {
       for (const cat of SECTION_ORDER) grouped[cat].sort((a, b) => b.count - a.count);
 
       const lines = [
-        `TM-OPS: ${province}${periodLabel(period)}`,
+        `TM-OPS: ${province}${label}`,
         '-'.repeat(40),
         `Total ops:  ${events.length}  (${success} ok, ${fail} fail, ${rate}%)`,
         `Lost:       ${lostParts.length ? lostParts.join(', ') : '0'}`,
@@ -137,7 +176,7 @@ module.exports = {
     const nameWidth = Math.max(...sorted.map((r) => r.province.length)) + 2;
 
     const lines = [
-      `TM-OPS Summary${periodLabel(period)}`,
+      `TM-OPS Summary${label}`,
       '-'.repeat(40),
       ...sorted.map((r) => {
         const fail = r.total - r.success;

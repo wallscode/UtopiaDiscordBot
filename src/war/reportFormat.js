@@ -212,4 +212,4 @@ function formatAgeReport({ age, wars, windows = [], perWar, summary, province, i
   return lines.join('\n');
 }
 
-module.exports = { formatWarReport, formatAgeReport };
+module.exports = { formatWarReport, formatAgeReport, warRange };
