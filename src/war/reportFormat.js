@@ -61,8 +61,14 @@ function kingdomLines(summary, opponentLabel) {
 }
 
 function provinceTable(summary) {
+  // Most hits first, then most acres, then most ops (the Ops column).
+  const opsCount = (p) => {
+    const c = opsByCategory(p);
+    return c[CATEGORY.THIEVERY].count + c[CATEGORY.SPELL].count;
+  };
   const rows = [...summary.provinces.values()]
-    .sort((a, b) => b.made.acres - a.made.acres || b.made.count - a.made.count || a.name.localeCompare(b.name));
+    .sort((a, b) => b.made.count - a.made.count || b.made.acres - a.made.acres
+      || opsCount(b) - opsCount(a) || a.name.localeCompare(b.name));
   const lines = [
     `${'Province'.padEnd(20)} ${pad('Hits', 4)} ${pad('+Acres', 7)} ${pad('Hit', 4)} ${pad('-Acres', 7)} `
       + `${pad('Ops', 5)} ${pad('Success', 7)} ${pad('Intel', 5)}`,

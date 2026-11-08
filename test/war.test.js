@@ -526,3 +526,31 @@ test('listAges: age folders newest first', () => {
   fs.mkdirSync(path.join(dir, 'ages', 'notes'));
   assert.deepEqual(store.listAges(), [117, 116, 115]);
 });
+
+test('province table: most hits, then most acres, then most ops', () => {
+  const row = (name, hits, acres, ops) => {
+    const p = {
+      name,
+      made: { count: hits, acres, byType: {} },
+      taken: { count: 0, acres: 0, byType: {} },
+      ops: { vsOpponent: new Map() },
+    };
+    if (ops) p.ops.vsOpponent.set('fireball', { meta: { category: 'spell' }, count: ops, success: ops });
+    return [name.toLowerCase(), p];
+  };
+  const summary = {
+    kingdom: { made: 0, acresGained: 0, taken: 0, acresLost: 0, unknownMade: 0, vortexOwn: 0,
+      ops: { count: 0, success: 0, thievery: 0, spells: 0, intel: 0 } },
+    provinces: new Map([
+      row('Few Hits Big Land', 2, 900, 0),
+      row('Tie Fewer Ops', 5, 300, 10),
+      row('Tie More Ops', 5, 300, 40),
+      row('Most Hits', 9, 100, 0),
+      row('Same Hits More Acres', 5, 400, 0),
+    ]),
+  };
+  const war = { opponent: '6:7', startDate: 'February 20 of YR2', endDate: 'February 23 of YR2', ended: true };
+  const text = formatWarReport({ war, window: { start: null, end: null }, summary, age: 117 });
+  const order = text.split('\n').filter((l) => /^(Few|Tie|Most|Same)/.test(l)).map((l) => l.slice(0, 20).trim());
+  assert.deepEqual(order, ['Most Hits', 'Same Hits More Acres', 'Tie More Ops', 'Tie Fewer Ops', 'Few Hits Big Land']);
+});
