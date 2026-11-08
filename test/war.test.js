@@ -370,6 +370,9 @@ test('summary: matches #attacks to news, sorts ops, hides self-spells by default
   const text = formatWarReport({ war, window: store.window(war), summary: s, age: 117 });
   assert.match(text, /WAR vs 6:7 — Feb 20 YR2 – Feb 23 YR2 — Age 117/);
   assert.match(text, /Jurassic Park\s+2\s+109/);
+  assert.match(text, /Ops Success Intel/);
+  // Jurassic Park's 2 night strikes on the enemy: 1 ok (50%); no intel ops.
+  assert.match(text, /Jurassic Park\s+2\s+109\s+0\s+0\s+2\s+50%\s+0\n/);
   const detail = formatWarReport({ war, window: store.window(war), summary: s, age: 117, province: 'jurassic' });
   assert.match(detail, /From #attacks \(2 of 2 hits\): kills 151 \(\+20 prisoners\)/);
   assert.match(detail, /Mystic Vortex on kingdom-mates: 1/);
@@ -487,4 +490,24 @@ test('summary credits an unknown-province hit to the province #attacks names', (
   assert.equal(uw.discord.matched, 1);
   assert.equal(s.kingdom.unknownMade, 0);
   assert.equal(s.kingdom.made, 3);
+});
+
+test('latestWar: the running war, else the most recent, else the previous age', () => {
+  const dir = tmpDir();
+  const ages = newAges(dir);
+  const store = new WarStore({ dataDir: dir, ages, log: quiet });
+  const put = (age, key, startDate, ended) => {
+    const file = path.join(dir, 'ages', String(age), 'wars', `${key}.json`);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ key, age, opponent: key, startDate, ended, news: [], events: [] }));
+  };
+  assert.equal(store.latestWar(), null);
+  put(116, 'old', 'March 1 of YR5', true);
+  assert.equal(store.latestWar().key, 'old', 'no wars yet this age: last war of the previous age');
+  put(117, 'first', 'June 5 of YR0', true);
+  put(117, 'second', 'February 20 of YR2', true);
+  assert.equal(store.latestWar().key, 'second', 'not at war: the most recent war');
+  put(117, 'now', 'May 9 of YR2', false);
+  assert.equal(store.latestWar().key, 'now', 'at war: the running war');
+  assert.equal(store.latestWar().age, 117);
 });

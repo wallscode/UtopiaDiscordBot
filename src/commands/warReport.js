@@ -9,20 +9,20 @@ const { sendChunked } = require('./commandUtils');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('war-report')
-    .setDescription('Per-province summary of a war this age: Kingdom News hits plus #attacks and #tm-ops')
+    .setDescription('Per-province war summary: the current war, or the last one if not at war')
     .addStringOption((o) =>
-      o.setName('opponent').setDescription('Enemy kingdom, e.g. 6:7').setRequired(true))
+      o.setName('opponent').setDescription('Look up an earlier war this age by enemy kingdom, e.g. 6:7'))
     .addStringOption((o) =>
       o.setName('province').setDescription('Show one province in full'))
     .addBooleanOption((o) =>
       o.setName('self_spells').setDescription('Include self-spells (off by default)')),
 
   async execute(interaction) {
-    const opponent = interaction.options.getString('opponent').trim();
+    const opponent = interaction.options.getString('opponent')?.trim() || null;
     const province = interaction.options.getString('province');
     const includeSelfSpells = interaction.options.getBoolean('self_spells') ?? false;
 
-    if (!OPPONENT_RE.test(opponent)) {
+    if (opponent && !OPPONENT_RE.test(opponent)) {
       return interaction.reply({
         content: `"${opponent}" isn't a kingdom location. Use the form N:N, e.g. \`6:7\`.`,
         ephemeral: true,
@@ -30,23 +30,33 @@ module.exports = {
     }
 
     war.tick();
-    const wars = war.warStore.findWars(opponent);
-    if (!wars.length) {
-      return interaction.reply({
-        content: `${war.pendingBanner()}No war vs ${opponent} recorded in age ${war.ages.currentAge}.`,
-        ephemeral: true,
-      });
+    let shown;
+    let otherWars = 0;
+    if (opponent) {
+      const wars = war.warStore.findWars(opponent);
+      if (!wars.length) {
+        return interaction.reply({
+          content: `${war.pendingBanner()}No war vs ${opponent} recorded in age ${war.ages.currentAge}.`,
+          ephemeral: true,
+        });
+      }
+      [shown] = wars;
+      otherWars = wars.length - 1;
+    } else {
+      shown = war.warStore.latestWar();
+      if (!shown) {
+        return interaction.reply({ content: `${war.pendingBanner()}No wars recorded yet.`, ephemeral: true });
+      }
     }
-    const latest = wars[0];
-    const summary = summarize([latest], { includeSelfSpells, knownProvinces: getProvinces() });
+    const summary = summarize([shown], { includeSelfSpells, knownProvinces: getProvinces() });
     const text = formatWarReport({
-      war: latest,
-      window: war.warStore.window(latest),
+      war: shown,
+      window: war.warStore.window(shown),
       summary,
-      age: war.ages.currentAge,
+      age: shown.age,
       province,
       includeSelfSpells,
-      otherWars: wars.length - 1,
+      otherWars,
     });
     await sendChunked(interaction, war.pendingBanner() + text);
   },

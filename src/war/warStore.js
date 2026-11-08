@@ -236,6 +236,23 @@ class WarStore {
       .sort((a, b) => gameDateTicks(a.startDate) - gameDateTicks(b.startDate));
   }
 
+  // The war /war-report shows by default: one still running, else the most
+  // recent. Falls back to earlier ages when the current one has no wars yet
+  // (just after a new age starts). Returns null if there are none at all.
+  latestWar() {
+    const root = path.join(this.dataDir, 'ages');
+    const ages = fs.existsSync(root)
+      ? fs.readdirSync(root).filter((d) => /^\d+$/.test(d)).map(Number)
+      : [];
+    const order = [this.ages.currentAge, ...ages.filter((a) => a < this.ages.currentAge).sort((a, b) => b - a)];
+    for (const age of order) {
+      const wars = this.listWars(age);
+      if (!wars.length) continue;
+      return wars.filter((w) => !w.ended).at(-1) ?? wars.at(-1);
+    }
+    return null;
+  }
+
   // Wars against an opponent in the current age, most recent first.
   findWars(opponent) {
     return this.listWars().filter((w) => w.opponent === opponent).reverse();

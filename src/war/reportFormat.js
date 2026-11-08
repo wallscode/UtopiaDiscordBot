@@ -64,19 +64,23 @@ function provinceTable(summary) {
   const rows = [...summary.provinces.values()]
     .sort((a, b) => b.made.acres - a.made.acres || b.made.count - a.made.count || a.name.localeCompare(b.name));
   const lines = [
-    `${'Province'.padEnd(20)} ${pad('Hits', 4)} ${pad('+Acres', 7)} ${pad('Hit', 4)} ${pad('-Acres', 7)} ${pad('Ops', 5)} ${pad('ok', 4)}`,
-    '-'.repeat(57),
+    `${'Province'.padEnd(20)} ${pad('Hits', 4)} ${pad('+Acres', 7)} ${pad('Hit', 4)} ${pad('-Acres', 7)} `
+      + `${pad('Ops', 5)} ${pad('Success', 7)} ${pad('Intel', 5)}`,
+    '-'.repeat(66),
   ];
   for (const p of rows) {
     const c = opsByCategory(p);
     const ops = c[CATEGORY.THIEVERY].count + c[CATEGORY.SPELL].count;
     const ok = c[CATEGORY.THIEVERY].success + c[CATEGORY.SPELL].success;
+    const intel = c[CATEGORY.INTEL].success;
     lines.push(`${trunc(p.name, 20)} ${pad(p.made.count, 4)} ${pad(formatNum(p.made.acres), 7)} `
-      + `${pad(p.taken.count, 4)} ${pad(formatNum(p.taken.acres), 7)} ${pad(formatNum(ops), 5)} ${pad(pct(ok, ops), 4)}`);
+      + `${pad(p.taken.count, 4)} ${pad(formatNum(p.taken.acres), 7)} ${pad(formatNum(ops), 5)} `
+      + `${pad(pct(ok, ops), 7)} ${pad(formatNum(intel), 5)}`);
   }
   lines.push('');
   lines.push('Hits/+Acres: attacks made (Kingdom News). Hit/-Acres: attacks received.');
-  lines.push('Ops: thievery + spells on the enemy (#tm-ops), intel not counted.');
+  lines.push('Ops/Success: thievery + spells on the enemy (#tm-ops) and their success rate.');
+  lines.push('Intel: successful intel ops on the enemy.');
   return lines;
 }
 
