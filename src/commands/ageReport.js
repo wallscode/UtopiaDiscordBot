@@ -8,7 +8,9 @@ const { sendChunked } = require('./commandUtils');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('age-report')
-    .setDescription('Per-province summary of every war in the current age')
+    .setDescription('Kingdom summary of every war in the age: the current age, or an earlier one')
+    .addIntegerOption((o) =>
+      o.setName('age').setDescription('An earlier age number, e.g. 116 (default: the current age)').setMinValue(1))
     .addStringOption((o) =>
       o.setName('province').setDescription('Show one province in full'))
     .addBooleanOption((o) =>
@@ -19,18 +21,32 @@ module.exports = {
     const includeSelfSpells = interaction.options.getBoolean('self_spells') ?? false;
 
     war.tick();
-    const wars = war.warStore.listWars();
-    const age = war.ages.currentAge;
+    const currentAge = war.ages.currentAge;
+    const age = interaction.options.getInteger('age') ?? currentAge;
+    const wars = war.warStore.listWars(age);
     if (!wars.length) {
+      const kept = war.warStore.listAges().filter((a) => war.warStore.listWars(a).length);
       return interaction.reply({
-        content: `${war.pendingBanner()}No wars recorded in age ${age} yet.`,
+        content: `${war.pendingBanner()}No wars recorded in age ${age}`
+          + (age === currentAge ? ' yet.' : '.')
+          + (kept.length ? ` Ages with war data: ${kept.join(', ')}.` : ''),
         ephemeral: true,
       });
     }
-    const knownProvinces = getProvinces();
+    // Province names change every age, so the current list only helps now.
+    const knownProvinces = age === currentAge ? getProvinces() : [];
     const perWar = wars.map((w) => summarize([w], { knownProvinces }));
     const summary = summarize(wars, { includeSelfSpells, knownProvinces });
-    const text = formatAgeReport({ age, wars, perWar, summary, province, includeSelfSpells });
+    const text = formatAgeReport({
+      age,
+      wars,
+      windows: wars.map((w) => war.warStore.window(w)),
+      perWar,
+      summary,
+      province,
+      includeSelfSpells,
+      current: age === currentAge,
+    });
     await sendChunked(interaction, war.pendingBanner() + text);
   },
 };

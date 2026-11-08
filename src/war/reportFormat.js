@@ -54,7 +54,7 @@ function kingdomLines(summary, opponentLabel) {
       + (k.unknownMade ? `, ${k.unknownMade} by unnamed provinces` : '') + ')   '
       + `Hits taken: ${formatNum(k.taken)} (-${formatNum(k.acresLost)} acres)   `
       + `Net: ${net >= 0 ? '+' : ''}${formatNum(net)}`,
-    `Ops on ${opponentLabel}: ${formatNum(k.ops.count)} (${pct(k.ops.success, k.ops.count)} ok) — `
+    `Ops on ${opponentLabel}: ${formatNum(k.ops.count)} (${pct(k.ops.success, k.ops.count)} success) — `
       + `${formatNum(k.ops.thievery)} thievery, ${formatNum(k.ops.spells)} spells, ${formatNum(k.ops.intel)} intel`
       + (k.vortexOwn ? `   Mystic Vortex on kingdom-mates: ${k.vortexOwn}` : ''),
   ];
@@ -163,22 +163,43 @@ function formatWarReport({ war, window, summary, age, province, includeSelfSpell
   return lines.join('\n');
 }
 
-function formatAgeReport({ age, wars, perWar, summary, province, includeSelfSpells }) {
-  const lines = [`AGE ${age} — ${wars.length} war(s)`, ''];
+// windows: each war's real-time window (WarStore.window), same order as wars.
+function formatAgeReport({ age, wars, windows = [], perWar, summary, province, includeSelfSpells, current = true }) {
+  const first = wars[0];
+  const last = wars.at(-1);
+  const span = `${shortGameDate(first.startDate)} – `
+    + (last.ended ? shortGameDate(last.endDate) : 'ongoing');
+  const lines = [`AGE ${age} — ${span} — ${wars.length} war(s)${current ? '' : ' (past age)'}`];
+
+  // Real time: first war's start to the last war's end, and hours at war.
+  const starts = windows.map((w) => w.start).filter((t) => t !== null);
+  if (starts.length) {
+    const fmt = (ms) => new Date(ms).toISOString().slice(5, 16).replace('T', ' ');
+    const atWar = windows.reduce((h, w) => (w.start === null ? h
+      : h + Math.round(((w.end ?? Date.now()) - w.start) / 3600000)), 0);
+    const lastEnd = windows.at(-1).end;
+    lines.push(`${fmt(Math.min(...starts))} – ${lastEnd ? fmt(lastEnd) : 'now'} UTC (${atWar}h at war)`);
+  }
+  lines.push('');
+
+  const warLines = ['WARS'];
   wars.forEach((war, i) => {
     const k = perWar[i].kingdom;
     const net = k.acresGained - k.acresLost;
-    lines.push(`  vs ${war.opponent.padEnd(5)} ${warRange(war).padEnd(28)} `
-      + `hits ${pad(k.made, 4)}/${pad(k.taken, 4)}  net ${net >= 0 ? '+' : ''}${formatNum(net)}`);
+    warLines.push(`  vs ${war.opponent.padEnd(5)} ${warRange(war).padEnd(26)} `
+      + `hits ${pad(k.made, 4)} made ${pad(k.taken, 4)} taken  net ${net >= 0 ? '+' : ''}${formatNum(net)}`);
   });
-  lines.push('');
+
   if (province) {
     const p = findProvince(summary, province);
     if (!p) return `No war data for a province named "${province}" in age ${age}.`;
+    lines.push(...warLines, '');
     lines.push(...provinceDetail(p, 'the enemy', { includeSelfSpells }));
     return lines.join('\n');
   }
   lines.push(...kingdomLines(summary, 'enemies'));
+  lines.push('');
+  lines.push(...warLines);
   lines.push('');
   lines.push(...provinceTable(summary));
   lines.push('Add province:<name> for one province\'s full breakdown.');

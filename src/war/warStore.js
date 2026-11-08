@@ -236,6 +236,13 @@ class WarStore {
       .sort((a, b) => gameDateTicks(a.startDate) - gameDateTicks(b.startDate));
   }
 
+  // Age numbers that have a folder under data/ages/, newest first.
+  listAges() {
+    const root = path.join(this.dataDir, 'ages');
+    if (!fs.existsSync(root)) return [];
+    return fs.readdirSync(root).filter((d) => /^\d+$/.test(d)).map(Number).sort((a, b) => b - a);
+  }
+
   // The war /war-report shows by default: one still running, else the most
   // recent. Falls back to earlier ages when the current one has no wars yet
   // (just after a new age starts). Returns null if there are none at all.

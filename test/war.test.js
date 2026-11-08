@@ -378,9 +378,15 @@ test('summary: matches #attacks to news, sorts ops, hides self-spells by default
   assert.match(detail, /Mystic Vortex on kingdom-mates: 1/);
   assert.doesNotMatch(detail, /SELF-SPELLS/);
 
-  const ageText = formatAgeReport({ age: 117, wars: [war], perWar: [s], summary: s });
-  assert.match(ageText, /AGE 117 — 1 war/);
-  assert.match(ageText, /vs 6:7/);
+  const ageText = formatAgeReport({ age: 117, wars: [war], windows: [store.window(war)], perWar: [s], summary: s });
+  assert.match(ageText, /^AGE 117 — Feb 20 YR2 – Feb 23 YR2 — 1 war\(s\)\n/);
+  assert.match(ageText, /UTC \(4h at war\)/); // 4 game days = 4 hours
+  assert.match(ageText, /Ops on enemies: \d+ \(\d+% success\)/);
+  assert.match(ageText, /WARS\n  vs 6:7 .* hits    2 made    1 taken  net \+69/);
+  assert.ok(ageText.indexOf('Hits made:') < ageText.indexOf('WARS'), 'totals first, like the war report');
+  assert.ok(ageText.indexOf('WARS') < ageText.indexOf('Province '), 'then the wars, then the table');
+  const past = formatAgeReport({ age: 116, wars: [war], windows: [store.window(war)], perWar: [s], summary: s, current: false });
+  assert.match(past, /^AGE 116 .* \(past age\)/);
 });
 
 // ── fixes found on real data (2026-11-08) ───────────────────────────────
@@ -510,4 +516,13 @@ test('latestWar: the running war, else the most recent, else the previous age', 
   put(117, 'now', 'May 9 of YR2', false);
   assert.equal(store.latestWar().key, 'now', 'at war: the running war');
   assert.equal(store.latestWar().age, 117);
+});
+
+test('listAges: age folders newest first', () => {
+  const dir = tmpDir();
+  const store = new WarStore({ dataDir: dir, ages: newAges(dir), log: quiet });
+  assert.deepEqual(store.listAges(), []);
+  for (const a of [115, 117, 116]) fs.mkdirSync(path.join(dir, 'ages', String(a)), { recursive: true });
+  fs.mkdirSync(path.join(dir, 'ages', 'notes'));
+  assert.deepEqual(store.listAges(), [117, 116, 115]);
 });
