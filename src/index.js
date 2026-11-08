@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
-const { parseMessage } = require('./handlers/dragonParser');
+const { parseMessage, parseDragonLines } = require('./handlers/dragonParser');
 const { load: loadDragon, record } = require('./handlers/dragonStore');
 const { load: loadProvinces } = require('./handlers/provinceStore');
 const { load: loadActivity, update: updateActivity } = require('./handlers/activityStore');
@@ -115,6 +115,8 @@ client.on('messageCreate', (message) => {
       record(parsed, message.id, message.createdAt.toISOString());
       console.log(`Recorded [${parsed.type}] for province: ${parsed.province}`);
     }
+    warData.logMessageEvents(channelName, message.id,
+      parseDragonLines(message.content, message.createdAt.toISOString()));
   }
 
   // Activity tracking across all channels

@@ -13,7 +13,13 @@ const eventLog = new EventLog({ retentionDays: WAR_LOG_RETENTION_DAYS });
 const warStore = new WarStore({ ages, eventLog });
 
 // Discord channel -> event kind written to the rolling log.
-const LOGGED_CHANNELS = { attacks: 'attack', 'tm-ops': 'espionage', 'self-spells': 'selfspell' };
+const LOGGED_CHANNELS = {
+  attacks: 'attack',
+  'tm-ops': 'espionage',
+  'self-spells': 'selfspell',
+  aid: 'aid',
+  dragons: 'dragon',
+};
 
 function init() {
   ages.load();
@@ -53,6 +59,7 @@ function rebuildWars() {
     for (const r of warStore.rebuildAll()) {
       if (r.before !== r.after) console.log(`War data: ${r.key} events ${r.before} -> ${r.after}.`);
     }
+    warStore.saveAllTmReports();
   } catch (err) {
     console.error('War data: rebuilding wars failed:', err);
   }

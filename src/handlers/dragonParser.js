@@ -29,4 +29,19 @@ function parseMessage(rawContent) {
   return results;
 }
 
-module.exports = { parseMessage };
+// Same events, one per line with its line number and time, for the on-disk
+// war log (war/eventLog.js), which identifies events by message and line.
+function parseDragonLines(rawContent, timestamp) {
+  const results = [];
+  rawContent.split('\n').forEach((line, i) => {
+    for (const event of parseMessage(line)) {
+      // Every event carries all four numbers (0 where they don't apply), the
+      // same shape dragonStore keeps.
+      results.push({ goldDonated: 0, bushelsDonated: 0, troopsSent: 0, pointsWeakened: 0,
+        ...event, line: i, timestamp });
+    }
+  });
+  return results;
+}
+
+module.exports = { parseMessage, parseDragonLines };

@@ -7,6 +7,7 @@ const { parseAttackMessage } = require('../parsers/attackParser');
 const { parseRitualMessage } = require('../parsers/ritualParser');
 const { parseEspionageMessage } = require('../parsers/espionageParser');
 const { parseSelfSpellMessage } = require('../parsers/selfSpellParser');
+const { parseDragonLines } = require('./dragonParser');
 const { logMessageEvents, WAR_LOG_RETENTION_DAYS, LOGGED_CHANNELS } = require('../war/context');
 
 const SOURCE_BOT_USERNAME = 'utopiabot';
@@ -25,6 +26,9 @@ const CHANNEL_CONFIG = {
   'tm-ops':  { parse: parseEspionageMessage, add: addEspionage },
   // Self-spells only go to the on-disk war log; no command reads them live.
   'self-spells': { parse: parseSelfSpellMessage, add: null },
+  // Dragons go to the war log here; /dragon-stats keeps its own store,
+  // filled by handlers/backfill.js.
+  dragons: { parse: parseDragonLines, add: null },
 };
 
 function timestampToSnowflake(ms) {

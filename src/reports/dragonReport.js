@@ -1,8 +1,11 @@
 const { getAggregated: getDragonData } = require('../handlers/dragonStore');
 const { getAll: getProvinces } = require('../handlers/provinceStore');
 
-function getMergedProvinces(periodHours) {
-  const dragonData = getDragonData(periodHours);
+// `source`, when given, replaces the dragon store: { entries, label } where
+// entries are per-province totals (a war's, from its stored record) and label
+// goes after "Dragon Summary" in the title.
+function getMergedProvinces(periodHours, source) {
+  const dragonData = source ? source.entries : getDragonData(periodHours);
   const dragonMap = new Map(dragonData.map((p) => [p.province.toLowerCase(), p]));
   const inventory = getProvinces();
 
@@ -78,14 +81,19 @@ function buildAttackSection(provinces, nameWidth) {
   return lines.join('\n');
 }
 
-function generateDragonReport(periodHours) {
-  const provinces = getMergedProvinces(periodHours);
+function titleSuffix(periodHours, source) {
+  if (source) return source.label;
+  return periodHours ? ` (last ${periodHours}h)` : '';
+}
+
+function generateDragonReport(periodHours, source) {
+  const provinces = getMergedProvinces(periodHours, source);
   if (provinces.length === 0) {
     return ['No data recorded yet.'];
   }
 
   const nameWidth = Math.max(...provinces.map((p) => p.province.length)) + 2;
-  const periodLine = periodHours ? ` (last ${periodHours}h)` : '';
+  const periodLine = titleSuffix(periodHours, source);
 
   return [
     `**Dragon Summary${periodLine}**\n\`\`\`\n${buildDonationSection(provinces, nameWidth)}\n\`\`\``,
@@ -93,14 +101,14 @@ function generateDragonReport(periodHours) {
   ];
 }
 
-function generateForumReport(periodHours) {
-  const provinces = getMergedProvinces(periodHours);
+function generateForumReport(periodHours, source) {
+  const provinces = getMergedProvinces(periodHours, source);
   if (provinces.length === 0) {
     return ['No data recorded yet.'];
   }
 
   const nameWidth = Math.max(...provinces.map((p) => p.province.length)) + 2;
-  const periodLine = periodHours ? ` (last ${periodHours}h)` : '';
+  const periodLine = titleSuffix(periodHours, source);
 
   return [
     `\`\`\`\nDragon Summary${periodLine}\n\n${buildDonationSection(provinces, nameWidth)}\n\`\`\``,
@@ -108,12 +116,12 @@ function generateForumReport(periodHours) {
   ];
 }
 
-function generateMobileForumReport(periodHours) {
-  const provinces = getMergedProvinces(periodHours);
+function generateMobileForumReport(periodHours, source) {
+  const provinces = getMergedProvinces(periodHours, source);
   if (provinces.length === 0) {
     return ['No data recorded yet.'];
   }
-  const periodLine = periodHours ? ` (last ${periodHours}h)` : '';
+  const periodLine = titleSuffix(periodHours, source);
 
   const nameWidth = Math.max(...provinces.map((p) => p.province.length)) + 2;
 

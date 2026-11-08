@@ -215,4 +215,65 @@ function opsByCategory(p) {
   return out;
 }
 
-module.exports = { summarize, matchAttacks, opsByCategory, key };
+// ── Aid and dragons ────────────────────────────────────────────────────
+
+const AID_RESOURCES = ['gold', 'bushels', 'runes', 'soldiers'];
+const emptyAid = () => Object.fromEntries(AID_RESOURCES.map((r) => [r, 0]));
+
+// Per province: aid sent and received during the wars, by resource, with
+// counts of shipments. Keyed by lower-cased name; `name` keeps the display
+// form (the province list's when known).
+function summarizeAid(wars, { knownProvinces = [] } = {}) {
+  const display = new Map(knownProvinces.map((p) => [key(p), p]));
+  const provinces = new Map();
+  const prov = (name) => {
+    const k = key(name);
+    if (!provinces.has(k)) {
+      provinces.set(k, { name: display.get(k) || name.trim(), sent: emptyAid(), received: emptyAid(),
+        shipmentsSent: 0, shipmentsReceived: 0 });
+    }
+    return provinces.get(k);
+  };
+  const totals = emptyAid();
+  for (const war of wars) {
+    for (const e of war.events || []) {
+      if (e.kind !== 'aid') continue;
+      const resource = AID_RESOURCES.includes(e.resource) ? e.resource : null;
+      const from = prov(e.sender);
+      const to = prov(e.receiver);
+      from.shipmentsSent++;
+      to.shipmentsReceived++;
+      if (!resource) continue;
+      from.sent[resource] += e.amount || 0;
+      to.received[resource] += e.amount || 0;
+      totals[resource] += e.amount || 0;
+    }
+  }
+  return { provinces, totals };
+}
+
+// Per province: dragon donations and attacks during the wars, the same
+// numbers /dragon-stats shows (dragonStore's aggregate).
+function summarizeDragons(wars, { knownProvinces = [] } = {}) {
+  const display = new Map(knownProvinces.map((p) => [key(p), p]));
+  const provinces = new Map();
+  const totals = { goldDonated: 0, bushelsDonated: 0, troopsSent: 0, pointsWeakened: 0 };
+  for (const war of wars) {
+    for (const e of war.events || []) {
+      if (e.kind !== 'dragon') continue;
+      const k = key(e.province);
+      if (!provinces.has(k)) {
+        provinces.set(k, { name: display.get(k) || e.province.trim(),
+          goldDonated: 0, bushelsDonated: 0, troopsSent: 0, pointsWeakened: 0 });
+      }
+      const p = provinces.get(k);
+      for (const f of Object.keys(totals)) {
+        p[f] += e[f] || 0;
+        totals[f] += e[f] || 0;
+      }
+    }
+  }
+  return { provinces, totals };
+}
+
+module.exports = { summarize, matchAttacks, opsByCategory, key, summarizeAid, summarizeDragons };

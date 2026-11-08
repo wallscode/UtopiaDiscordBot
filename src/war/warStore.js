@@ -12,17 +12,27 @@
 // items keep the real time they were first captured; Discord events keep
 // their message time, the time the bot saw them, and the game date they fall
 // on. A war's events are copied from the rolling EventLog for the war's
-// window: from the start of the declaration's game day to the end of the
-// post-war notice's day. Six hours after that the war is closed and nothing
+// window: from the start of the declaration's game day to the START of the
+// post-war notice's day. The war ends at the tick that begins that day: its
+// news holds only the withdrawal, dragon cancellations and the notice, and
+// whatever happens in Discord that day (say, killing a last-minute dragon)
+// is after the war. Six hours after the end the war is closed and nothing
 // more is added.
+//
+// One exception at the start: dragon donations (gold and bushels) from up to
+// 48 hours before the war count toward it, since a dragon is often funded
+// before war is declared. They're marked preWar. Dragon attacks and every
+// other kind of event start at the declaration.
 
 const fs = require('fs');
 const path = require('path');
 const { DEFAULT_DATA_DIR, readJson, writeJsonAtomic } = require('./jsonFile');
 const { dayStartMs, gameDateAt, gameDateTicks, tickZeroFromClock, HOUR_MS } = require('./gameTime');
 const { parseNewsAttack, detectOwnKingdom } = require('./newsParser');
+const { buildTmReport } = require('./tmReport');
 
 const CLOSE_AFTER_MS = 6 * HOUR_MS;
+const DRAGON_LEAD_MS = 48 * HOUR_MS;
 const OPPONENT_RE = /^\d{1,2}:\d{1,2}$/;
 
 function warKey(opponent, startDate) {
@@ -92,6 +102,41 @@ class WarStore {
     return path.join(this.ages.ageDir(age), 'wars', `${key}.json`);
   }
 
+  // Save a war, and next to it the forum Thief & Mage report built from it
+  // (<key>.tm-report.json), which Utopia-Automation posts in the war's
+  // forum thread.
+  saveWar(war) {
+    writeJsonAtomic(this.warFile(war.age, war.key), war);
+    this.saveTmReport(war);
+  }
+
+  tmReportFile(age, key) {
+    return path.join(this.ages.ageDir(age), 'wars', `${key}.tm-report.json`);
+  }
+
+  saveTmReport(war) {
+    writeJsonAtomic(this.tmReportFile(war.age, war.key), {
+      schema: 1,
+      key: war.key,
+      opponent: war.opponent,
+      startDate: war.startDate,
+      endDate: war.endDate || null,
+      ended: Boolean(war.ended),
+      // Closed: no more Discord events will be added, so the text is final.
+      closed: Boolean(war.closed),
+      generatedAt: new Date().toISOString(),
+      text: buildTmReport(war),
+    });
+  }
+
+  // Write every war's report in the age (at startup, so wars saved before
+  // this existed, or under an older report layout, get a current one).
+  saveAllTmReports(age = this.ages.currentAge) {
+    const wars = this.listWars(age);
+    for (const war of wars) this.saveTmReport(war);
+    return wars.length;
+  }
+
   ingest(payload, nowMs = Date.now()) {
     const age = this.ages.currentAge;
     const key = warKey(payload.opponent, payload.start_date);
@@ -146,30 +191,44 @@ class WarStore {
 
     if (war.closed && !war.ended) war.closed = false; // re-opened by newer news
     this.syncEvents(war, nowMs);
-    writeJsonAtomic(file, war);
+    this.saveWar(war);
     return war;
   }
 
   // Real-time window [start, end) of a war; end is null while it's running.
+  // The end is the tick that starts the post-war notice's day (see above).
   window(war) {
     const tz = war.tickZeroAt ? Date.parse(war.tickZeroAt) : null;
     const start = dayStartMs(war.startDate, tz);
-    const end = war.ended && war.endDate ? dayStartMs(war.endDate, tz) + HOUR_MS : null;
+    const end = war.ended && war.endDate ? dayStartMs(war.endDate, tz) : null;
     return { start, end };
   }
 
-  // Copy events inside the war's window from the rolling log. Returns the
-  // number added.
+  // The log events that belong to a war: those in its window, plus dragon
+  // donations from up to 48 hours before it (marked preWar).
+  _warEvents(war, nowMs) {
+    const { start, end } = this.window(war);
+    const tz = war.tickZeroAt ? Date.parse(war.tickZeroAt) : null;
+    const out = [];
+    for (const e of this.eventLog.inRange(start - DRAGON_LEAD_MS, end ?? nowMs + HOUR_MS)) {
+      const t = Date.parse(e.discordTime);
+      const preWar = t < start;
+      if (preWar && !(e.kind === 'dragon' && e.type === 'donation')) continue;
+      out.push({ ...e, gameDate: gameDateAt(t, tz), ...(preWar ? { preWar: true } : {}) });
+    }
+    return out;
+  }
+
+  // Copy the war's events from the rolling log. Returns the number added.
   syncEvents(war, nowMs = Date.now()) {
     if (war.closed || !this.eventLog) return 0;
     const { start, end } = this.window(war);
     if (start === null) return 0;
-    const tz = war.tickZeroAt ? Date.parse(war.tickZeroAt) : null;
     const have = new Set(war.events.map((e) => e.id));
     let added = 0;
-    for (const e of this.eventLog.inRange(start, end ?? nowMs + HOUR_MS)) {
+    for (const e of this._warEvents(war, nowMs)) {
       if (have.has(e.id)) continue;
-      war.events.push({ ...e, gameDate: gameDateAt(Date.parse(e.discordTime), tz) });
+      war.events.push(e);
       have.add(e.id);
       added++;
     }
@@ -189,11 +248,10 @@ class WarStore {
   // of (say a channel was renamed, or Discord was unreachable) keeps the
   // war's existing events of that kind rather than losing them.
   rebuildEvents(war, nowMs = Date.now()) {
-    const { start, end } = this.window(war);
-    if (start === null || !this.eventLog || start < this.eventLog.coverageStart(nowMs)) return false;
-    const tz = war.tickZeroAt ? Date.parse(war.tickZeroAt) : null;
-    const fresh = this.eventLog.inRange(start, end ?? nowMs + HOUR_MS)
-      .map((e) => ({ ...e, gameDate: gameDateAt(Date.parse(e.discordTime), tz) }));
+    const { start } = this.window(war);
+    if (start === null || !this.eventLog
+        || start - DRAGON_LEAD_MS < this.eventLog.coverageStart(nowMs)) return false;
+    const fresh = this._warEvents(war, nowMs);
     const freshKinds = new Set(fresh.map((e) => e.kind));
     const kept = war.events.filter((e) => !freshKinds.has(e.kind));
     war.events = [...fresh, ...kept]
@@ -207,7 +265,7 @@ class WarStore {
     for (const war of this.listWars()) {
       const before = war.events.length;
       if (!this.rebuildEvents(war, nowMs)) continue;
-      writeJsonAtomic(this.warFile(war.age, war.key), war);
+      this.saveWar(war);
       rebuilt.push({ key: war.key, before, after: war.events.length });
     }
     return rebuilt;
@@ -220,7 +278,7 @@ class WarStore {
       if (war.closed) continue;
       const wasClosed = war.closed;
       const n = this.syncEvents(war, nowMs);
-      if (n || war.closed !== wasClosed) writeJsonAtomic(this.warFile(war.age, war.key), war);
+      if (n || war.closed !== wasClosed) this.saveWar(war);
       added += n;
     }
     return added;
@@ -230,7 +288,7 @@ class WarStore {
     const dir = path.join(this.ages.ageDir(age), 'wars');
     if (!fs.existsSync(dir)) return [];
     return fs.readdirSync(dir)
-      .filter((f) => f.endsWith('.json'))
+      .filter((f) => f.endsWith('.json') && !f.endsWith('.tm-report.json'))
       .map((f) => readJson(path.join(dir, f)))
       .filter(Boolean)
       .sort((a, b) => gameDateTicks(a.startDate) - gameDateTicks(b.startDate));

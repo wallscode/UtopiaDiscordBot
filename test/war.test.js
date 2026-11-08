@@ -380,7 +380,7 @@ test('summary: matches #attacks to news, sorts ops, hides self-spells by default
 
   const ageText = formatAgeReport({ age: 117, wars: [war], windows: [store.window(war)], perWar: [s], summary: s });
   assert.match(ageText, /^AGE 117 — Feb 20 YR2 – Feb 23 YR2 — 1 war\(s\)\n/);
-  assert.match(ageText, /UTC \(4h at war\)/); // 4 game days = 4 hours
+  assert.match(ageText, /UTC \(3h at war\)/); // Feb 20–22: the war ends at the tick starting Feb 23
   assert.match(ageText, /Ops on enemies: \d+ \(\d+% success\)/);
   assert.match(ageText, /WARS\n  vs 6:7 .* hits    2 made    1 taken  net \+69/);
   assert.ok(ageText.indexOf('Hits made:') < ageText.indexOf('WARS'), 'totals first, like the war report');
@@ -609,4 +609,213 @@ test('/tm-stats: current/last war by default, a named war, or a period', () => {
   assert.match(selectOps({ war: '9:9' }, deps).error, /No war vs 9:9/);
   assert.match(selectOps({ war: '69' }, deps).error, /isn't a kingdom location/);
   assert.match(selectOps({ war: '6:7', period: 6 }, deps).error, /not both/);
+});
+
+// ── Thief & Mage forum report ───────────────────────────────────────────
+
+const { buildTmReport, opName } = require('../src/war/tmReport');
+
+test('TM report: op names read like the game', () => {
+  assert.equal(opName('rob the towers'), 'Rob the Towers');
+  assert.equal(opName('spy on throne'), 'Spy on Throne');
+  assert.equal(opName('propaganda: specialist'), 'Propaganda (Specialist)');
+  assert.equal(opName('fireball'), 'Fireball');
+});
+
+test('TM report: three top lists and the full report, enemy ops only', () => {
+  const t = '2026-11-06T00:00:00Z';
+  let n = 0;
+  const op = (province, missionType, opIcon, success, impactValue = 0, target = 'Foe (6:7)', lost = null) => ({
+    id: `e${n++}`, kind: 'espionage', province, missionType, opIcon, success, impactValue, target, discordTime: t,
+    lostCount: lost ? lost[0] : 0, lostUnit: lost ? lost[1] : null,
+  });
+  const events = [
+    ...Array.from({ length: 3 }, () => op('Thief A', 'rob the vaults', 'detective', true, 1000)),
+    op('Thief A', 'rob the vaults', 'detective', false, 0, 'Foe (6:7)', [7, 'thieves']),
+    op('Thief A', 'kidnap', 'detective', true, 50),
+    ...Array.from({ length: 2 }, () => op('Thief B', 'night strike', 'detective', true, 20)),
+    ...Array.from({ length: 2 }, () => op('Mage C', 'meteor showers', 'comet', true, 8)),
+    op('Mage C', 'fireball', 'comet', true, 300),
+    op('Mage C', 'fireball', 'comet', false, 0, 'Foe (6:7)', [3, 'wizards']),
+    ...Array.from({ length: 4 }, () => op('Spy D', 'spy on throne', 'detective', true)),
+    op('Spy D', 'survey', 'detective', true),
+    op('Mage C', 'mystic vortex', 'comet', true, 0, 'Friend (1:5)'),
+    op('Thief A', 'rob the vaults', 'detective', true, 99999, 'Bystander (2:2)'),  // not the enemy
+    { id: 'self', kind: 'selfspell', province: 'Mage C', spell: 'patriotism', success: true, discordTime: t },
+  ];
+  const war = { opponent: '6:7', ownKingdom: '1:5', startDate: 'February 20 of YR2', endDate: 'April 21 of YR2', ended: true, events };
+  const text = buildTmReport(war);
+  const lines = text.split('\n');
+  assert.equal(lines[0], 'Thief & Mage Report — War vs 6:7 (Feb 20 YR2 – Apr 21 YR2)');
+  assert.equal(lines[1], 'Full war.');
+  assert.equal(lines[2], 'Successful ops on 6:7: 6 thievery, 3 spells, 5 intel');
+  assert.match(text, /TOP THIEVES — successful thievery ops on 6:7\n4 \| Thief A — Rob the Vaults x3: 3,000 gc stolen\n2 \| Thief B — Night Strike x2: 40 troops killed/);
+  assert.match(text, /TOP MAGES — successful spells on 6:7\n3 \| Mage C — Meteor Showers x2: 16 days/);
+  assert.match(text, /TOP INTEL GATHERERS — successful intel ops on 6:7\n5 \| Spy D — Spy on Throne x4, Survey x1/);
+  assert.doesNotMatch(text, /99,999/, 'ops on other kingdoms are left out');
+  assert.match(text, /1\. Thief A — 4 successful \(4 thievery, 0 spells\)\n   Lost 7 thieves\n   Thievery\n     3\/4 Rob the Vaults: 3,000 gc stolen\n     1\/1 Kidnap: 50 peasants kidnapped/);
+  assert.match(text, /2\. Mage C — 3 successful \(0 thievery, 3 spells\)\n   Lost 3 wizards\n   Spells\n     2\/2 Meteor Showers: 16 days\n     1\/2 Fireball: 300 peasants killed\n   Mystic Vortex on kingdom-mates: 1 \(1 successful\)/);
+  assert.doesNotMatch(text, /Spy D — \d+ successful/, 'intel-only provinces are not in the full report');
+  assert.match(buildTmReport({ ...war, ended: false, endDate: null }), /^.*\(Feb 20 YR2 – ongoing\)\nWar so far\.\.\./);
+});
+
+test('TM report file is written next to the war and kept out of the war list', () => {
+  const { dir, store } = setup();
+  const c = clockAt('February 23 of YR2', dayStart('February 23 of YR2'), 30);
+  writeInbox(dir, warPayload({ ended: true, clock: c }));
+  store.processInbox(Date.parse(c.read_at));
+  const [war] = store.findWars(OPP);
+  const file = path.join(dir, 'ages', '117', 'wars', `${war.key}.tm-report.json`);
+  const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(report.opponent, OPP);
+  assert.equal(report.startDate, 'February 20 of YR2');
+  assert.equal(report.ended, true);
+  assert.match(report.text, /^Thief & Mage Report — War vs 6:7/);
+  assert.equal(store.listWars().length, 1);
+  assert.equal(store.saveAllTmReports(), 1);
+});
+
+// ── aid and dragons in the war records ──────────────────────────────────
+
+const { parseAidMessage } = require('../src/parsers/aidParser');
+const { parseDragonLines } = require('../src/handlers/dragonParser');
+const { summarizeAid, summarizeDragons } = require('../src/war/warSummary');
+
+test('aid and dragon lines parse with line numbers', () => {
+  const aid = parseAidMessage(':moneybag: Joker [jok#] sent __300,000 gold coins__ to Olko [olko]\n'
+    + ':moneybag: Joker [jok#] sent __50,000 bushels__ to Sleepers [sleepers]', 't');
+  assert.deepEqual(aid.map((e) => [e.sender, e.receiver, e.resource, e.amount, e.line]),
+    [['Joker', 'Olko', 'gold', 300000, 0], ['Joker', 'Sleepers', 'bushels', 50000, 1]]);
+  const dragons = parseDragonLines(':dragon_face: __DRAGON__ Olko [olk#] donated __75,000 gold coins__ to fund dragon!\n'
+    + ':dragon_face: __DRAGON__ Joker [jok#] sent __1,200__ troops and weakened dragon by __9,876__ points!', 't');
+  assert.deepEqual(dragons.map((e) => [e.type, e.province, e.goldDonated, e.troopsSent, e.pointsWeakened, e.line]),
+    [['donation', 'Olko', 75000, 0, 0, 0], ['attack', 'Joker', 0, 1200, 9876, 1]]);
+});
+
+test('war records carry aid and dragon events in their window, summarized per province', () => {
+  const { dir, store, eventLog } = setup();
+  const at = (date, minutes) => new Date(dayStart(date) + minutes * 60000).toISOString();
+  parseAidMessage(':moneybag: Joker [jok#] sent __300,000 gold coins__ to Olko [olko]\n'
+    + ':moneybag: Olko [olk#] sent __2,000 soldiers__ to Joker [joker]', at('February 21 of YR2', 3))
+    .forEach((e, i) => eventLog.append('aid', 'a1', i, e));
+  parseAidMessage(':moneybag: Joker [jok#] sent __999 runes__ to Olko [olko]', at('February 19 of YR2', 3))
+    .forEach((e, i) => eventLog.append('aid', 'a0', i, e));   // before the war
+  parseDragonLines(':dragon_face: __DRAGON__ Olko [olk#] donated __75,000 gold coins__ to fund dragon!\n'
+    + ':dragon_face: __DRAGON__ Olko [olk#] donated __20,000 bushels__ to fund dragon!\n'
+    + ':dragon_face: __DRAGON__ Joker [jok#] sent __1,200__ troops and weakened dragon by __9,876__ points!',
+  at('February 22 of YR2', 10)).forEach((e, i) => eventLog.append('dragon', 'd1', i, e));
+
+  const c = clockAt('February 23 of YR2', dayStart('February 23 of YR2'), 30);
+  writeInbox(dir, warPayload({ ended: true, clock: c }));
+  store.processInbox(Date.parse(c.read_at));
+  const [war] = store.findWars(OPP);
+  assert.equal(war.events.filter((e) => e.kind === 'aid').length, 2, 'the pre-war shipment is left out');
+  assert.equal(war.events.filter((e) => e.kind === 'dragon').length, 3);
+  assert.ok(war.events.every((e) => e.gameDate));
+
+  const aid = summarizeAid([war], { knownProvinces: ['Joker', 'Olko'] });
+  assert.deepEqual(aid.provinces.get('joker').sent, { gold: 300000, bushels: 0, runes: 0, soldiers: 0 });
+  assert.deepEqual(aid.provinces.get('joker').received, { gold: 0, bushels: 0, runes: 0, soldiers: 2000 });
+  assert.equal(aid.provinces.get('olko').received.gold, 300000);
+  assert.equal(aid.provinces.get('olko').shipmentsSent, 1);
+  assert.deepEqual(aid.totals, { gold: 300000, bushels: 0, runes: 0, soldiers: 2000 });
+
+  const dragons = summarizeDragons([war]);
+  assert.deepEqual({ ...dragons.provinces.get('olko') }, { name: 'Olko', goldDonated: 75000, bushelsDonated: 20000, troopsSent: 0, pointsWeakened: 0 });
+  assert.equal(dragons.provinces.get('joker').pointsWeakened, 9876);
+  assert.deepEqual(dragons.totals, { goldDonated: 75000, bushelsDonated: 20000, troopsSent: 1200, pointsWeakened: 9876 });
+
+  // The TM report ignores them.
+  assert.match(JSON.parse(fs.readFileSync(store.tmReportFile(117, war.key), 'utf8')).text, /^Thief & Mage Report/);
+});
+
+test('a war ends at the tick that starts the post-war notice day', () => {
+  const { dir, store, eventLog } = setup();
+  const c = clockAt('February 23 of YR2', dayStart('February 23 of YR2'), 30);
+  // A dragon killed on the notice's day is after the war.
+  parseDragonLines(':dragon_face: __DRAGON__ Joker [jok#] sent __4,000__ troops and weakened dragon by __50,000__ points!',
+    new Date(dayStart('February 23 of YR2') + 20 * 60000).toISOString())
+    .forEach((e, i) => eventLog.append('dragon', 'late', i, e));
+  writeInbox(dir, warPayload({ ended: true, clock: c }));
+  store.processInbox(Date.parse(c.read_at));
+  const [war] = store.findWars(OPP);
+  assert.equal(store.window(war).end, dayStart('February 23 of YR2'));
+  assert.ok(!war.events.some((e) => e.messageId === 'late'));
+});
+
+// ── /dragon-stats war:… ─────────────────────────────────────────────────
+
+const { lookupWar } = require('../src/war/warLookup');
+const { warSource } = require('../src/commands/dragon');
+const { generateDragonReport, generateForumReport } = require('../src/reports/dragonReport');
+
+test('a war takes dragon donations from up to 48h before it, and nothing else early', () => {
+  const { dir, store, eventLog } = setup();
+  const start = dayStart('February 20 of YR2');
+  const at = (hoursBefore) => new Date(start - hoursBefore * H).toISOString();
+  const dragon = (line, t, id) => parseDragonLines(line, t).forEach((e, i) => eventLog.append('dragon', id, i, e));
+  dragon(':dragon_face: __DRAGON__ Olko [olk#] donated __10,000 gold coins__ to fund dragon!', at(47), 'd47');
+  dragon(':dragon_face: __DRAGON__ Olko [olk#] donated __5,000 bushels__ to fund dragon!', at(1), 'd1');
+  dragon(':dragon_face: __DRAGON__ Olko [olk#] donated __99,000 gold coins__ to fund dragon!', at(49), 'd49');
+  dragon(':dragon_face: __DRAGON__ Joker [jok#] sent __500__ troops and weakened dragon by __4,000__ points!', at(2), 'a2');
+  parseAidMessage(':moneybag: Joker [jok#] sent __1,000 runes__ to Olko [olko]', at(3))
+    .forEach((e, i) => eventLog.append('aid', 'aid3', i, e));
+
+  const c = clockAt('February 23 of YR2', dayStart('February 23 of YR2'), 30);
+  writeInbox(dir, warPayload({ ended: true, clock: c }));
+  store.processInbox(Date.parse(c.read_at));
+  let [war] = store.findWars(OPP);
+  const early = war.events.filter((e) => e.preWar);
+  assert.deepEqual(early.map((e) => e.messageId).sort(), ['d1', 'd47']);
+  assert.ok(!war.events.some((e) => ['d49', 'a2', 'aid3'].includes(e.messageId)));
+  assert.deepEqual(summarizeDragons([war]).totals, { goldDonated: 10000, bushelsDonated: 5000, troopsSent: 0, pointsWeakened: 0 });
+
+  // A rebuild gives the same set.
+  store.rebuildAll(Date.parse(c.read_at));
+  [war] = store.findWars(OPP);
+  assert.deepEqual(war.events.filter((e) => e.preWar).map((e) => e.messageId).sort(), ['d1', 'd47']);
+
+  // And the other summaries don't see them.
+  const s = summarize([war]);
+  assert.equal(s.kingdom.made, 2);
+});
+
+test('lookupWar: current, by kingdom, and errors', () => {
+  const dir = tmpDir();
+  const store = new WarStore({ dataDir: dir, ages: newAges(dir), log: quiet });
+  const deps = { warStore: store, refresh: () => {}, currentAge: () => 117 };
+  assert.match(lookupWar('current', deps).error, /No war recorded/);
+  const put = (key, opponent, startDate, ended) => {
+    const file = path.join(dir, 'ages', '117', 'wars', `${key}.json`);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ key, age: 117, opponent, startDate, ended, news: [], events: [] }));
+  };
+  put('a', '5:12', 'June 5 of YR0', true);
+  put('b', '6:7', 'February 20 of YR2', true);
+  assert.equal(lookupWar('current', deps).war.key, 'b');
+  assert.equal(lookupWar(' Current ', deps).war.key, 'b');
+  assert.equal(lookupWar('5:12', deps).war.key, 'a');
+  assert.match(lookupWar('9:9', deps).error, /No war vs 9:9 recorded in age 117/);
+  assert.match(lookupWar('last', deps).error, /isn't a war/);
+});
+
+test('/dragon-stats war report: war totals in every format, titled with the war', () => {
+  const war = {
+    opponent: '6:7', startDate: 'February 20 of YR2', endDate: 'April 21 of YR2', ended: true,
+    events: [
+      { kind: 'dragon', type: 'donation', province: 'Olko', goldDonated: 75000, bushelsDonated: 0, troopsSent: 0, pointsWeakened: 0, preWar: true },
+      { kind: 'dragon', type: 'attack', province: 'Joker', goldDonated: 0, bushelsDonated: 0, troopsSent: 1200, pointsWeakened: 9876 },
+      { kind: 'aid', sender: 'Joker', receiver: 'Olko', resource: 'gold', amount: 5 },
+    ],
+  };
+  const source = warSource(war);
+  assert.equal(source.label, ' — war vs 6:7 (Feb 20 YR2 – Apr 21 YR2) incl. donations up to 48h before the war');
+  const [donations, attacks] = generateDragonReport(null, source);
+  assert.match(donations, /^\*\*Dragon Summary — war vs 6:7 \(Feb 20 YR2 – Apr 21 YR2\)/);
+  assert.match(donations, /Olko\s+GC: 75,000\s+Bushels: 0/);
+  assert.match(donations, /Total\s+GC: 75,000/);
+  assert.match(attacks, /Joker\s+Points: 9,876\s+Troops: 1,200/);
+  assert.match(generateForumReport(null, source)[0], /Dragon Summary — war vs 6:7/);
+  assert.equal(warSource({ ...war, ended: false, endDate: null, events: [] }).label,
+    ' — war vs 6:7 (Feb 20 YR2 – ongoing, so far)');
 });

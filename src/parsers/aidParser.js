@@ -24,12 +24,14 @@ function parseAidLine(line) {
   return { sender: sender.trim(), receiver: receiver.trim(), resource, amount };
 }
 
+// `line` is the event's line number within the message, a stable identity
+// for the event (see war/eventLog.js).
 function parseAidMessage(content, timestamp) {
   const results = [];
-  for (const line of content.split('\n')) {
+  content.split('\n').forEach((line, i) => {
     const event = parseAidLine(line.trim());
-    if (event) results.push({ ...event, timestamp });
-  }
+    if (event) results.push({ ...event, line: i, timestamp });
+  });
   return results;
 }
 
