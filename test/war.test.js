@@ -672,7 +672,103 @@ test('TM report file is written next to the war and kept out of the war list', (
   assert.equal(report.ended, true);
   assert.match(report.text, /^Thief & Mage Report — War vs 6:7/);
   assert.equal(store.listWars().length, 1);
-  assert.equal(store.saveAllTmReports(), 1);
+  assert.equal(store.saveAllForumReports(), 1);
+});
+
+// ── Attacker forum report ───────────────────────────────────────────────
+
+const { buildAttackReport, lossUnits } = require('../src/war/attackReport');
+
+test('a recapture parses as a recapture only, not also a capture', () => {
+  const [recap] = parseAttackMessage(`:crossed_swords: Sleepers [**sleeper#**] attacked __Allstars__ (${OPP})|recaptured: **59**|loss: **10 Drakes**|kills: **5**|return: 8.12|23313off (1 gens)`, 't');
+  assert.equal(recap.attackType, 'recapture');
+  assert.equal(recap.landsRecapt, 59);
+  assert.equal(recap.landsCapt, 0);
+  const [cap] = parseAttackMessage(`:crossed_swords: Sleepers [**sleeper#**] attacked __Allstars__ (${OPP})|captured: **91**|loss: **10 Drakes**|kills: **5**|return: 8.12|23313off (1 gens)`, 't');
+  assert.equal(cap.attackType, 'capture');
+  assert.equal(cap.landsCapt, 91);
+});
+
+test('attack report: loss text splits into units', () => {
+  assert.deepEqual(lossUnits('1,722 Drakes and 641 Griffins'), [['Drakes', 1722], ['Griffins', 641]]);
+  assert.deepEqual(lossUnits('2 soldiers, 170 Night Rangers and 331 horses'),
+    [['soldiers', 2], ['Night Rangers', 170], ['horses', 331]]);
+  assert.deepEqual(lossUnits(''), []);
+});
+
+test('attack report: provinces by offense sent, every hit counts, razes and masses shown', () => {
+  let n = 0;
+  const hit = (attacker, fields) => ({
+    id: `a${n++}`, kind: 'attack', attacker, target: 'Foe', coords: OPP, discordTime: '2026-11-06T00:00:00Z',
+    landsCapt: 0, landsRecapt: 0, landsRazed: 0, massacred: 0, kills: 0, prisoners: 0,
+    troopLossStr: '', troopLosses: 0, returnTime: 8, offPts: 0, generals: 1, ...fields,
+  });
+  const events = [
+    hit('Gone In 60 Seconds', { landsCapt: 80, kills: 100, prisoners: 50, offPts: 60000, generals: 2,
+      troopLossStr: '300 Drakes and 20 soldiers', troopLosses: 320, returnTime: 7 }),
+    hit('Gone In 60 Seconds', { massacred: 1000, offPts: 40000, returnTime: 9 }),
+    hit('Sleepers', { landsCapt: 50, kills: 40, offPts: 55000, troopLossStr: '100 Drakes', troopLosses: 100 }),
+    // Saved before the recapture fix: the acres are in both fields, count them once.
+    hit('Sleepers', { landsCapt: 30, landsRecapt: 30, kills: 10, offPts: 15000 }),
+    hit('Sleepers', { landsRazed: 200, kills: 20, offPts: 30000, generals: 3 }),
+    hit('Gone In 60 Seconds', { landsCapt: 999, kills: 999, offPts: 999999, coords: '2:2' }),  // not the enemy
+    { id: 'op', kind: 'espionage', province: 'Sleepers', missionType: 'kidnap', target: `Foe (${OPP})` },
+  ];
+  const news = [
+    `3 - Sleepers (${OWN}) attempted to invade 7 - Foe (${OPP}), but was repelled.`,
+    `7 - Foe (${OPP}) invaded 1 - Gone In 60 Seconds (${OWN}) and captured 40 acres of land.`,
+    `7 - Foe (${OPP}) razed 30 acres of 1 - Gone In 60 Seconds (${OWN}).`,
+    `7 - Foe (${OPP}) attempted to invade 3 - Sleepers (${OWN}), but was repelled.`,
+  ].map((text) => ({ gameDate: 'February 21 of YR2', text }));
+  const war = { opponent: OPP, ownKingdom: OWN, startDate: 'February 20 of YR2', endDate: 'April 21 of YR2',
+    ended: true, events, news };
+  const text = buildAttackReport(war);
+  assert.equal(text, [
+    'Attacker Report — War vs 6:7 (Feb 20 YR2 – Apr 21 YR2)',
+    'Full war.',
+    'Hits on 6:7: 5 | Offense sent: 200,000 | Land captured: 160 acres | Kills: 1,170',
+    '',
+    'TOP ATTACKERS — total offense sent on 6:7',
+    '100,000 | Gone In 60 Seconds — 2 hits, 80 acres, 1,100 kills',
+    '100,000 | Sleepers — 3 hits, 80 acres, 70 kills',
+    '',
+    'FULL REPORT — every province that attacked 6:7, by total offense sent',
+    '',
+    '1. Gone In 60 Seconds — 100,000 offense in 2 hits',
+    '   Land: 80 acres captured in 1 hit',
+    '   Massacre: 1,000 killed in 1 hit',
+    '   Offense: 50,000 avg · biggest 60,000 · smallest 40,000',
+    '   Kills: 1,100 (100 troops + 1,000 massacred) · 50 prisoners taken',
+    '   Losses: 320 (300 Drakes, 20 soldiers)',
+    '   Generals Used: 1×1, 1×2',
+    '   Average Attack Speed: 8.0 hours',
+    '   Hit by 6:7: 2 times, 40 acres lost',
+    '',
+    '2. Sleepers — 100,000 offense in 3 hits',
+    '   Land: 80 acres captured in 2 hits · 200 acres razed in 1 hit',
+    '   Offense: 33,333 avg · biggest 55,000 · smallest 15,000',
+    '   Kills: 70 troops · 0 prisoners taken',
+    '   Losses: 100 (100 Drakes)',
+    '   Generals Used: 2×1, 1×3',
+    '   Average Attack Speed: 8.0 hours',
+    '   Bounces: 1',
+    '   Hit by 6:7: 0 times, 0 acres lost',
+  ].join('\n'));
+  assert.match(buildAttackReport({ ...war, ended: false, endDate: null }), /^.*\(Feb 20 YR2 – ongoing\)\nWar so far\.\.\./);
+  assert.match(buildAttackReport({ ...war, events: [] }), /No attacks recorded for this war\.$/);
+});
+
+test('attack report file is written next to the war and kept out of the war list', () => {
+  const { dir, store } = setup();
+  const c = clockAt('February 23 of YR2', dayStart('February 23 of YR2'), 30);
+  writeInbox(dir, warPayload({ ended: true, clock: c }));
+  store.processInbox(Date.parse(c.read_at));
+  const [war] = store.findWars(OPP);
+  const report = JSON.parse(fs.readFileSync(store.attackReportFile(117, war.key), 'utf8'));
+  assert.equal(report.opponent, OPP);
+  assert.equal(report.startDate, 'February 20 of YR2');
+  assert.match(report.text, /^Attacker Report — War vs 6:7/);
+  assert.equal(store.listWars().length, 1);
 });
 
 // ── aid and dragons in the war records ──────────────────────────────────

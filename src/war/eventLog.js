@@ -12,7 +12,9 @@
 // provinces, so a parser fix that recognizes more lines would shift positions.)
 //
 // The log is only a copy of Discord. If its id format changes (FORMAT_VERSION),
-// it is cleared at load and the startup backfill reads it in again.
+// it is cleared at load and the startup backfill reads it in again. The same
+// goes for a parser fix that changes what old events should have said:
+//   3 — recaptures no longer also parse as captures (landsCapt was set too).
 
 const fs = require('fs');
 const path = require('path');
@@ -20,7 +22,7 @@ const { DEFAULT_DATA_DIR } = require('./jsonFile');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FILE_RE = /^(\d{4}-\d{2}-\d{2})\.jsonl$/;
-const FORMAT_VERSION = 2;
+const FORMAT_VERSION = 3;
 
 class EventLog {
   constructor({ dataDir = DEFAULT_DATA_DIR, retentionDays = 14 } = {}) {

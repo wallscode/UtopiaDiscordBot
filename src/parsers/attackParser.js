@@ -13,7 +13,8 @@ const ATTACKER_REGEX  = /([^[\]]+?) \[.*?\] attacked/;
 const EMOJI_PREFIX    = /^(?::crossed_swords:|⚔\uFE0F?)\s*/;
 const TARGET_REGEX    = /attacked (.+?) \(/;
 const COORDS_REGEX    = /\((\d+:\d+)\)/;
-const CAPTURES_REGEX  = /captured:\s+([\d,]+)/;
+// Not preceded by "re": "recaptured: 59" is a recapture, not also a capture.
+const CAPTURES_REGEX  = /(?<!re)captured:\s+([\d,]+)/;
 const RECAPT_REGEX    = /recaptured:\s+([\d,]+)/;
 const LEARN_REGEX     = /learn:\s+([\d,]+)/;
 const RAZED_REGEX     = /razed:\s+([\d,]+)/;

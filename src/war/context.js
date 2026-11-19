@@ -59,7 +59,7 @@ function rebuildWars() {
     for (const r of warStore.rebuildAll()) {
       if (r.before !== r.after) console.log(`War data: ${r.key} events ${r.before} -> ${r.after}.`);
     }
-    warStore.saveAllTmReports();
+    warStore.saveAllForumReports();
   } catch (err) {
     console.error('War data: rebuilding wars failed:', err);
   }

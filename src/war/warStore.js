@@ -30,6 +30,15 @@ const { DEFAULT_DATA_DIR, readJson, writeJsonAtomic } = require('./jsonFile');
 const { dayStartMs, gameDateAt, gameDateTicks, tickZeroFromClock, HOUR_MS } = require('./gameTime');
 const { parseNewsAttack, detectOwnKingdom } = require('./newsParser');
 const { buildTmReport } = require('./tmReport');
+const { buildAttackReport } = require('./attackReport');
+
+// The forum reports saved next to each war's own <key>.json, one per post
+// Utopia-Automation keeps in the war's "War Report N:N" thread.
+const FORUM_REPORTS = [
+  { suffix: '.tm-report.json', build: buildTmReport },
+  { suffix: '.attack-report.json', build: buildAttackReport },
+];
+const isForumReportFile = (f) => FORUM_REPORTS.some((r) => f.endsWith(r.suffix));
 
 const CLOSE_AFTER_MS = 6 * HOUR_MS;
 const DRAGON_LEAD_MS = 48 * HOUR_MS;
@@ -102,38 +111,48 @@ class WarStore {
     return path.join(this.ages.ageDir(age), 'wars', `${key}.json`);
   }
 
-  // Save a war, and next to it the forum Thief & Mage report built from it
-  // (<key>.tm-report.json), which Utopia-Automation posts in the war's
-  // forum thread.
+  // Save a war, and next to it the forum reports built from it
+  // (<key>.tm-report.json, <key>.attack-report.json), which Utopia-Automation
+  // posts in the war's forum thread.
   saveWar(war) {
     writeJsonAtomic(this.warFile(war.age, war.key), war);
-    this.saveTmReport(war);
+    this.saveForumReports(war);
+  }
+
+  reportFile(age, key, suffix) {
+    return path.join(this.ages.ageDir(age), 'wars', `${key}${suffix}`);
   }
 
   tmReportFile(age, key) {
-    return path.join(this.ages.ageDir(age), 'wars', `${key}.tm-report.json`);
+    return this.reportFile(age, key, '.tm-report.json');
   }
 
-  saveTmReport(war) {
-    writeJsonAtomic(this.tmReportFile(war.age, war.key), {
-      schema: 1,
-      key: war.key,
-      opponent: war.opponent,
-      startDate: war.startDate,
-      endDate: war.endDate || null,
-      ended: Boolean(war.ended),
-      // Closed: no more Discord events will be added, so the text is final.
-      closed: Boolean(war.closed),
-      generatedAt: new Date().toISOString(),
-      text: buildTmReport(war),
-    });
+  attackReportFile(age, key) {
+    return this.reportFile(age, key, '.attack-report.json');
   }
 
-  // Write every war's report in the age (at startup, so wars saved before
-  // this existed, or under an older report layout, get a current one).
-  saveAllTmReports(age = this.ages.currentAge) {
+  saveForumReports(war) {
+    for (const { suffix, build } of FORUM_REPORTS) {
+      writeJsonAtomic(this.reportFile(war.age, war.key, suffix), {
+        schema: 1,
+        key: war.key,
+        opponent: war.opponent,
+        startDate: war.startDate,
+        endDate: war.endDate || null,
+        ended: Boolean(war.ended),
+        // Closed: no more Discord events will be added, so the text is final.
+        closed: Boolean(war.closed),
+        generatedAt: new Date().toISOString(),
+        text: build(war),
+      });
+    }
+  }
+
+  // Write every war's reports in the age (at startup, so wars saved before
+  // a report existed, or under an older report layout, get a current one).
+  saveAllForumReports(age = this.ages.currentAge) {
     const wars = this.listWars(age);
-    for (const war of wars) this.saveTmReport(war);
+    for (const war of wars) this.saveForumReports(war);
     return wars.length;
   }
 
@@ -288,7 +307,7 @@ class WarStore {
     const dir = path.join(this.ages.ageDir(age), 'wars');
     if (!fs.existsSync(dir)) return [];
     return fs.readdirSync(dir)
-      .filter((f) => f.endsWith('.json') && !f.endsWith('.tm-report.json'))
+      .filter((f) => f.endsWith('.json') && !isForumReportFile(f))
       .map((f) => readJson(path.join(dir, f)))
       .filter(Boolean)
       .sort((a, b) => gameDateTicks(a.startDate) - gameDateTicks(b.startDate));
