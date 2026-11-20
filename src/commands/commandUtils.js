@@ -1,9 +1,33 @@
-const ADMIN_ROLE_NAME = process.env.ADMIN_ROLE_NAME || 'Admin';
+const { PermissionFlagsBits } = require('discord.js');
+
+// Who may run the admin commands (/age, war-data cleanup, /provinces edits):
+// anyone with Discord's Administrator permission, plus — when ADMIN_ROLE_ID
+// is set in .env — anyone with that one role. Checked by permission and role
+// ID, never by role name: anyone able to create or rename roles could
+// otherwise make their own role called "Admin".
+const ADMIN_ROLE_ID = (process.env.ADMIN_ROLE_ID || '').trim();
+
+function hasAdministrator(member) {
+  const perms = member?.permissions;
+  if (!perms) return false;
+  if (typeof perms.has === 'function') return perms.has(PermissionFlagsBits.Administrator);
+  try {
+    // A member from raw interaction data carries its permissions as a string.
+    return (BigInt(perms) & PermissionFlagsBits.Administrator) === PermissionFlagsBits.Administrator;
+  } catch {
+    return false;
+  }
+}
+
+function hasAdminRole(member) {
+  if (!ADMIN_ROLE_ID) return false;
+  const roles = member?.roles;
+  if (roles?.cache) return roles.cache.has(ADMIN_ROLE_ID);
+  return Array.isArray(roles) && roles.includes(ADMIN_ROLE_ID);
+}
 
 function isAdmin(member) {
-  return Boolean(member?.roles?.cache?.some(
-    (role) => role.name.toLowerCase() === ADMIN_ROLE_NAME.toLowerCase()
-  ));
+  return hasAdministrator(member) || hasAdminRole(member);
 }
 
 function formatNum(n) {
